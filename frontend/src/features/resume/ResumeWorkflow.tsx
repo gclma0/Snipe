@@ -1,5 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BriefcaseBusiness, ClipboardCheck, FileUp, Gauge, GitCompareArrows, Plus } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  ClipboardCheck,
+  FileUp,
+  Gauge,
+  GitCompareArrows,
+  LayoutDashboard,
+  Plus,
+} from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -8,6 +16,7 @@ import {
   CandidateProfile,
   DeterministicScoreResult,
   JobDescriptionResult,
+  ReadinessDashboardResult,
   ResumeQualityResult,
   ResumeUploadResult,
   SkillGapResult,
@@ -15,6 +24,7 @@ import {
   createProfile,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
+  runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
   uploadResume,
@@ -44,6 +54,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
+  const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -77,6 +88,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCompletenessResult(null);
       setJobResult(null);
       setSkillGapResult(null);
+      setDashboardResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -96,6 +108,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const result = await createJobDescription(accessToken, profile.id, values.text);
       setJobResult(result);
       setSkillGapResult(null);
+      setDashboardResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -119,12 +132,31 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setSkillGapResult(null);
+      setDashboardResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleRunDashboard() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await runReadinessDashboard(accessToken, profile.id, jobResult?.id ?? null);
+      setDashboardResult(result);
+      setMessage("Readiness dashboard completed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not run readiness dashboard.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -253,6 +285,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
                 Run readiness scores
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunDashboard}>
+                <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
+                Run readiness dashboard
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -324,6 +360,22 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <JobField label="Transferable" values={skillGapResult.transferable_skills.map((item) => item.skill)} />
                 <JobField label="Not relevant" values={skillGapResult.not_relevant_skills.map((item) => item.skill).slice(0, 8)} />
               </div>
+            </div>
+          ) : null}
+          {dashboardResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Readiness dashboard</h3>
+                <p className="text-2xl font-semibold">{dashboardResult.scores.overall}</p>
+              </div>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Resume quality" values={[String(dashboardResult.scores.resume_quality)]} />
+                <JobField label="ATS readiness" values={[String(dashboardResult.scores.ats_readiness)]} />
+                <JobField label="Profile completeness" values={[String(dashboardResult.scores.profile_completeness)]} />
+                <JobField label="Skill alignment" values={dashboardResult.scores.skill_alignment === null ? [] : [String(dashboardResult.scores.skill_alignment)]} />
+                <JobField label="Primary specialization" values={dashboardResult.interpretation.primary_specialization ? [dashboardResult.interpretation.primary_specialization.name] : []} />
+                <JobField label="Estimated seniority" values={dashboardResult.interpretation.estimated_seniority ? [dashboardResult.interpretation.estimated_seniority] : []} />
+              </dl>
             </div>
           ) : null}
         </>

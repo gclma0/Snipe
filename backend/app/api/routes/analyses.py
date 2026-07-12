@@ -39,6 +39,16 @@ from app.scoring.profile_completeness import (
 from app.scoring.profile_completeness import (
     analyze_profile_completeness,
 )
+from app.scoring.readiness import (
+    ANALYSIS_TYPE as READINESS_ANALYSIS_TYPE,
+)
+from app.scoring.readiness import (
+    DETERMINISTIC_VERSION as READINESS_DETERMINISTIC_VERSION,
+)
+from app.scoring.readiness import (
+    ReadinessDashboardResult,
+    build_readiness_dashboard,
+)
 from app.supabase.client import SupabaseClient, SupabaseError
 from app.supabase.dependencies import get_supabase_client
 
@@ -49,6 +59,10 @@ Supabase = Depends(get_supabase_client)
 
 class SkillGapRequest(BaseModel):
     job_description_id: str
+
+
+class ReadinessDashboardRequest(BaseModel):
+    job_description_id: str | None = None
 
 
 @router.post(
@@ -84,6 +98,68 @@ def create_resume_quality_analysis(
                 "deterministic_version": DETERMINISTIC_VERSION,
                 "result_json": result.model_dump(),
                 "score": result.score,
+                "status": "completed",
+            }
+        )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
+@router.post(
+    "/readiness-dashboard",
+    response_model=ReadinessDashboardResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_readiness_dashboard(
+    profile_id: str,
+    payload: ReadinessDashboardRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> ReadinessDashboardResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before running the readiness dashboard.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = None
+        if job_description_id:
+            job_description = supabase.get_job_description(
+                job_description_id=job_description_id,
+                profile_id=profile_id,
+                user_id=user.id,
+            )
+            if job_description is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Job description not found.",
+                )
+            structured_job = job_description.get("structured_json") or {}
+
+        result = build_readiness_dashboard(normalized_profile, structured_job)
+        supabase.create_analysis(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "analysis_type": READINESS_ANALYSIS_TYPE,
+                "input_hash": _dashboard_input_hash(normalized_profile, structured_job),
+                "profile_version": profile.get("version") or 1,
+                "job_description_id": job_description_id,
+                "deterministic_version": READINESS_DETERMINISTIC_VERSION,
+                "result_json": result.model_dump(),
+                "score": result.scores.overall,
                 "status": "completed",
             }
         )
@@ -153,6 +229,13 @@ def create_skill_gap_analysis(
         ) from exc
 
     return result
+
+
+def _dashboard_input_hash(
+    normalized_profile: dict,
+    structured_job: dict | None,
+) -> str:
+    return skill_gap_input_hash(normalized_profile, structured_job or {})
 
 
 @router.post(

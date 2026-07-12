@@ -86,6 +86,34 @@ export type SkillGapResult = {
   checks: Record<string, boolean>;
 };
 
+export type SpecializationSignal = {
+  name: string;
+  confidence: number;
+  evidence: string[];
+};
+
+export type ReadinessDashboardResult = {
+  analysis_type: string;
+  deterministic_version: string;
+  scores: {
+    overall: number;
+    resume_quality: number;
+    ats_readiness: number;
+    skill_alignment: number | null;
+    profile_completeness: number;
+  };
+  interpretation: {
+    interpreter_version: string;
+    primary_specialization: SpecializationSignal | null;
+    secondary_specializations: SpecializationSignal[];
+    estimated_seniority: string | null;
+    seniority_confidence: number;
+    evidence: string[];
+  };
+  skill_gap: SkillGapResult | null;
+  checks: Record<string, boolean>;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -161,5 +189,19 @@ export function runSkillGapAnalysis(token: string, profileId: string, jobDescrip
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ job_description_id: jobDescriptionId }),
+  });
+}
+
+export function runReadinessDashboard(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+) {
+  return request<ReadinessDashboardResult>(`/profiles/${profileId}/analyses/readiness-dashboard`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
   });
 }

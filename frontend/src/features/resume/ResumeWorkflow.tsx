@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BriefcaseBusiness, ClipboardCheck, FileUp, Gauge, Plus } from "lucide-react";
+import { BriefcaseBusiness, ClipboardCheck, FileUp, Gauge, GitCompareArrows, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -10,11 +10,13 @@ import {
   JobDescriptionResult,
   ResumeQualityResult,
   ResumeUploadResult,
+  SkillGapResult,
   createJobDescription,
   createProfile,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
   runResumeQualityAnalysis,
+  runSkillGapAnalysis,
   uploadResume,
 } from "@/lib/api";
 
@@ -41,6 +43,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
+  const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -73,6 +76,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setSkillGapResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -91,6 +95,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await createJobDescription(accessToken, profile.id, values.text);
       setJobResult(result);
+      setSkillGapResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -113,12 +118,31 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setQualityResult(null);
       setAtsResult(null);
       setCompletenessResult(null);
+      setSkillGapResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleRunSkillGap() {
+    if (!accessToken || !profile || !jobResult?.id) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await runSkillGapAnalysis(accessToken, profile.id, jobResult.id);
+      setSkillGapResult(result);
+      setMessage("Skill gap analysis completed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not run skill gap analysis.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -282,6 +306,24 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <JobField label="Tools" values={jobResult.structured.tools} />
                 <JobField label="ATS keywords" values={jobResult.structured.ats_keywords.slice(0, 8)} />
               </dl>
+              <button className="mt-4 inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy || !uploadResult} type="button" onClick={handleRunSkillGap}>
+                <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                Run skill gap analysis
+              </button>
+            </div>
+          ) : null}
+          {skillGapResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Skill gap</h3>
+                <p className="text-2xl font-semibold">{skillGapResult.score}</p>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Matched" values={skillGapResult.matched_skills.map((item) => item.skill)} />
+                <JobField label="Missing" values={skillGapResult.missing_skills.map((item) => item.skill).slice(0, 8)} />
+                <JobField label="Transferable" values={skillGapResult.transferable_skills.map((item) => item.skill)} />
+                <JobField label="Not relevant" values={skillGapResult.not_relevant_skills.map((item) => item.skill).slice(0, 8)} />
+              </div>
             </div>
           ) : null}
         </>

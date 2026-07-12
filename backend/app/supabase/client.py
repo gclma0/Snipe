@@ -166,6 +166,30 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def get_job_description(
+        self,
+        *,
+        job_description_id: str,
+        profile_id: str,
+        user_id: str,
+    ) -> dict[str, Any] | None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/job_descriptions",
+                headers=self.headers,
+                params={
+                    "select": "id,user_id,profile_id,structured_json,input_hash",
+                    "id": f"eq.{job_description_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                    "limit": "1",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Job description fetch failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
+
     def list_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

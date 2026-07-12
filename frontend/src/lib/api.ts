@@ -66,6 +66,26 @@ export type JobDescriptionResult = {
   structured: StructuredJobDescription;
 };
 
+export type SkillGapItem = {
+  skill: string;
+  category: string;
+  importance: string;
+  evidence: string | null;
+};
+
+export type SkillGapResult = {
+  analysis_type: string;
+  deterministic_version: string;
+  score: number;
+  matched_skills: SkillGapItem[];
+  partially_matched_skills: SkillGapItem[];
+  missing_skills: SkillGapItem[];
+  transferable_skills: SkillGapItem[];
+  claimed_but_unverified_skills: SkillGapItem[];
+  not_relevant_skills: SkillGapItem[];
+  checks: Record<string, boolean>;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -131,5 +151,15 @@ export function createJobDescription(token: string, profileId: string, text: str
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ text }),
+  });
+}
+
+export function runSkillGapAnalysis(token: string, profileId: string, jobDescriptionId: string) {
+  return request<SkillGapResult>(`/profiles/${profileId}/analyses/skill-gap`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId }),
   });
 }

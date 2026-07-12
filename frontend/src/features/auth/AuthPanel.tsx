@@ -14,7 +14,11 @@ const signInSchema = z.object({
 
 type SignInValues = z.infer<typeof signInSchema>;
 
-export function AuthPanel() {
+type AuthPanelProps = {
+  onTokenChange?: (token: string | null) => void;
+};
+
+export function AuthPanel({ onTokenChange }: AuthPanelProps) {
   const [email, setEmail] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const form = useForm<SignInValues>({
@@ -32,14 +36,16 @@ export function AuthPanel() {
 
     supabase.auth.getSession().then(({ data }) => {
       setEmail(data.session?.user.email ?? null);
+      onTokenChange?.(data.session?.access_token ?? null);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user.email ?? null);
+      onTokenChange?.(session?.access_token ?? null);
     });
 
     return () => data.subscription.unsubscribe();
-  }, []);
+  }, [onTokenChange]);
 
   if (!isSupabaseConfigured || !supabase) {
     return (

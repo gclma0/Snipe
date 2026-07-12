@@ -22,6 +22,8 @@ class FakeSupabaseClient:
     owns_profile: bool = True
     uploaded: list[dict[str, Any]] = field(default_factory=list)
     sources: list[dict[str, Any]] = field(default_factory=list)
+    profiles: list[dict[str, Any]] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
 
     def profile_belongs_to_user(self, profile_id: str, user_id: str) -> bool:
         return self.owns_profile and profile_id == TEST_PROFILE_ID and user_id == TEST_USER_ID
@@ -39,6 +41,26 @@ class FakeSupabaseClient:
         row = {"id": "source-id", **payload}
         self.sources.append(row)
         return row
+
+    def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
+        if not self.profile_belongs_to_user(profile_id, user_id):
+            return None
+        return {"id": profile_id, "user_id": user_id, "version": 1, "normalized_json": {}}
+
+    def update_candidate_profile(
+        self,
+        *,
+        profile_id: str,
+        user_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        row = {"id": profile_id, "user_id": user_id, **payload}
+        self.profiles.append(row)
+        return row
+
+    def create_profile_evidence(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        self.evidence.extend(payloads)
+        return payloads
 
 
 def make_pdf(text: str = "Backend Developer") -> bytes:
@@ -118,7 +140,13 @@ def test_resume_upload_parses_uploads_and_records_pdf_source() -> None:
 
     response = client.post(
         f"/api/v1/profiles/{TEST_PROFILE_ID}/sources/resume",
-        files={"file": ("resume.pdf", make_pdf("QA Automation"), "application/pdf")},
+        files={
+            "file": (
+                "resume.pdf",
+                make_pdf("Summary\nQA Automation\nSkills\nPython, project management"),
+                "application/pdf",
+            )
+        },
         headers={"Authorization": f"Bearer {make_token()}"},
     )
 
@@ -129,8 +157,12 @@ def test_resume_upload_parses_uploads_and_records_pdf_source() -> None:
     assert body["status"] == "parsed"
     assert body["page_count"] == 1
     assert body["storage_path"] == f"{TEST_USER_ID}/{TEST_PROFILE_ID}/resume.pdf"
+    assert body["normalized_profile_updated"] is True
+    assert body["profile_version"] == 2
     assert fake.uploaded[0]["path"] == body["storage_path"]
     assert fake.sources[0]["content_hash"] == body["content_hash"]
+    assert fake.profiles[0]["normalized_json"]["schema_version"] == 1
+    assert fake.evidence
 
 
 def test_resume_upload_parses_uploads_and_records_docx_source() -> None:

@@ -7,7 +7,7 @@ describe("App", () => {
   it("renders the scaffold shell", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: /AI Career Intelligence Platform/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Snipe/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Supabase authentication/i })).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.parsing.resume_parser import SUPPORTED_RESUME_EXTENSIONS, parse_resume, resume_extension
+from app.profile.profile_builder import build_normalized_profile
 from app.storage.paths import candidate_document_path
 from app.supabase.client import SupabaseClient, SupabaseError
 from app.supabase.dependencies import get_supabase_client
@@ -31,6 +32,9 @@ class ResumeUploadResponse(BaseModel):
     text_length: int = Field(ge=0)
     page_count: int | None = Field(default=None, ge=0)
     paragraph_count: int | None = Field(default=None, ge=0)
+    profile_version: int | None = Field(default=None, ge=1)
+    evidence_count: int = Field(default=0, ge=0)
+    normalized_profile_updated: bool = False
 
 
 @router.post("/resume", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -84,6 +88,41 @@ async def upload_resume_source(
                 "parsed_at": datetime.now(tz=UTC).isoformat(),
             }
         )
+        source_id = source.get("id")
+        built_profile = build_normalized_profile(
+            parsed=parsed,
+            profile_id=profile_id,
+            source_id=source_id,
+        )
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        next_version = int(profile.get("version") or 1) + 1
+        updated_profile = supabase.update_candidate_profile(
+            profile_id=profile_id,
+            user_id=user.id,
+            payload={
+                "version": next_version,
+                "profile_status": "resume_parsed",
+                "normalized_json": built_profile.normalized_json,
+                "updated_at": datetime.now(tz=UTC).isoformat(),
+            },
+        )
+        evidence_rows = [
+            {
+                "profile_id": profile_id,
+                "source_id": source_id,
+                "fact_type": item.fact_type,
+                "fact_key": item.fact_key,
+                "excerpt": item.excerpt,
+                "normalized_value": item.normalized_value,
+                "confidence": item.confidence,
+                "location_json": item.location_json,
+            }
+            for item in built_profile.evidence
+        ]
+        created_evidence = supabase.create_profile_evidence(evidence_rows)
     except SupabaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -103,4 +142,7 @@ async def upload_resume_source(
         text_length=parsed.text_length,
         page_count=parsed.page_count,
         paragraph_count=parsed.paragraph_count,
+        profile_version=updated_profile.get("version"),
+        evidence_count=len(created_evidence),
+        normalized_profile_updated=True,
     )

@@ -11,10 +11,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "AI Career Intelligence Platform API"
+    app_name: str = "Snipe API"
     app_version: str = "0.1.0"
     environment: str = Field(default="local")
     enable_docs: bool = True
+    backend_cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
 
     ai_provider: str | None = None
     ai_model: str | None = None
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.backend_cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache

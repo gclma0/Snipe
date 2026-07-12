@@ -1,8 +1,15 @@
 import { Activity } from "lucide-react";
+import { useCallback, useState } from "react";
 
 import { AuthPanel } from "@/features/auth/AuthPanel";
+import { ResumeWorkflow } from "@/features/resume/ResumeWorkflow";
 
 export function App() {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const handleTokenChange = useCallback((token: string | null) => {
+    setAccessToken(token);
+  }, []);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex min-h-screen max-w-5xl flex-col justify-center px-6 py-12">
@@ -14,13 +21,14 @@ export function App() {
             Milestone 2 scaffold
           </p>
           <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
-            AI Career Intelligence Platform
+            Snipe
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
             Frontend tooling is ready. Product workflows begin in later milestones after
             authentication, storage, and the normalized candidate profile are in place.
           </p>
-          <AuthPanel />
+          <AuthPanel onTokenChange={handleTokenChange} />
+          <ResumeWorkflow accessToken={accessToken} />
         </div>
       </section>
     </main>

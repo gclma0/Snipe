@@ -76,3 +76,91 @@ class SupabaseClient:
             raise SupabaseError(f"Source metadata insert failed: {response.text[:300]}")
         rows = response.json()
         return rows[0] if rows else payload
+
+    def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/candidate_profiles",
+                headers=self.headers,
+                params={
+                    "select": "id,user_id,version,normalized_json",
+                    "id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                    "limit": "1",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Profile fetch failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
+
+    def update_candidate_profile(
+        self,
+        *,
+        profile_id: str,
+        user_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.patch(
+                f"{self.base_url}/rest/v1/candidate_profiles",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                params={"id": f"eq.{profile_id}", "user_id": f"eq.{user_id}"},
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Profile update failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else payload
+
+    def create_profile_evidence(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not payloads:
+            return []
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/profile_evidence",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payloads,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Evidence insert failed: {response.text[:300]}")
+        return response.json()
+
+    def list_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/candidate_profiles",
+                headers=self.headers,
+                params={
+                    "select": "id,career_goal,preferred_role,profile_status,created_at,updated_at",
+                    "user_id": f"eq.{user_id}",
+                    "order": "created_at.desc",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Profile list failed: {response.text[:300]}")
+        return response.json()
+
+    def create_candidate_profile(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/candidate_profiles",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Profile create failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else payload

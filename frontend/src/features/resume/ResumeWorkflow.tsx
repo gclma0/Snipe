@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   FileUp,
   Gauge,
+  Github,
   GitCompareArrows,
   LayoutDashboard,
   Plus,
@@ -18,11 +19,13 @@ import {
   BasicReportResult,
   CandidateProfile,
   DeterministicScoreResult,
+  GitHubSourceResult,
   JobDescriptionResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
   ResumeUploadResult,
   SkillGapResult,
+  addGitHubSource,
   createBasicReport,
   createJobDescription,
   createProfile,
@@ -44,8 +47,13 @@ const jobDescriptionSchema = z.object({
   text: z.string().min(100, "Paste at least 100 characters from the job description.").max(60000),
 });
 
+const githubSchema = z.object({
+  username_or_url: z.string().min(1, "GitHub username or URL is required.").max(120),
+});
+
 type ProfileValues = z.infer<typeof profileSchema>;
 type JobDescriptionValues = z.infer<typeof jobDescriptionSchema>;
+type GitHubValues = z.infer<typeof githubSchema>;
 
 type ResumeWorkflowProps = {
   accessToken: string | null;
@@ -58,6 +66,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
+  const [githubResult, setGithubResult] = useState<GitHubSourceResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
@@ -74,6 +83,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     resolver: zodResolver(jobDescriptionSchema),
     defaultValues: {
       text: "",
+    },
+  });
+  const githubForm = useForm<GitHubValues>({
+    resolver: zodResolver(githubSchema),
+    defaultValues: {
+      username_or_url: "",
     },
   });
 
@@ -93,6 +108,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setGithubResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -125,6 +141,24 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleAddGitHub(values: GitHubValues) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await addGitHubSource(accessToken, profile.id, values.username_or_url);
+      setGithubResult(result);
+      setMessage("GitHub source analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not analyze GitHub source.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !accessToken || !profile) {
@@ -139,6 +173,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setQualityResult(null);
       setAtsResult(null);
       setCompletenessResult(null);
+      setGithubResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -166,6 +201,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setGithubResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -306,6 +342,33 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <Trash2 aria-hidden="true" className="h-4 w-4" />
                 Delete profile data
               </button>
+            </div>
+          ) : null}
+          {profile ? (
+            <form className="mt-5 border-t border-border pt-5" onSubmit={githubForm.handleSubmit(handleAddGitHub)}>
+              <h3 className="text-base font-semibold">Optional GitHub source</h3>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <input className="w-full border border-border px-3 py-2 text-sm" placeholder="octocat or https://github.com/octocat" {...githubForm.register("username_or_url")} />
+                <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
+                  <Github aria-hidden="true" className="h-4 w-4" />
+                  Analyze GitHub
+                </button>
+              </div>
+              {githubForm.formState.errors.username_or_url ? <p className="mt-2 text-sm text-red-600">{githubForm.formState.errors.username_or_url.message}</p> : null}
+            </form>
+          ) : null}
+          {githubResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <h3 className="text-base font-semibold">GitHub analysis</h3>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Username" values={[githubResult.username]} />
+                <JobField label="Languages" values={githubResult.primary_languages} />
+                <JobField label="Repositories" values={[String(githubResult.analyzed_repository_count)]} />
+                <JobField label="README signals" values={[String(githubResult.readme_repository_count)]} />
+                <JobField label="Test signals" values={[String(githubResult.test_signal_count)]} />
+                <JobField label="CI signals" values={[String(githubResult.ci_signal_count)]} />
+                <JobField label="Notable repositories" values={githubResult.notable_repositories.slice(0, 4)} />
+              </dl>
             </div>
           ) : null}
           {uploadResult ? (

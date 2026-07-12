@@ -132,6 +132,22 @@ export type ProfileDeletionResult = {
   deleted_storage_objects: number;
 };
 
+export type GitHubSourceResult = {
+  source_id: string | null;
+  profile_id: string;
+  username: string;
+  status: string;
+  repository_count: number;
+  analyzed_repository_count: number;
+  primary_languages: string[];
+  readme_repository_count: number;
+  test_signal_count: number;
+  ci_signal_count: number;
+  notable_repositories: string[];
+  evidence_count: number;
+  profile_version: number | null;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -241,5 +257,15 @@ export function createBasicReport(
 export function deleteProfileData(token: string, profileId: string) {
   return request<ProfileDeletionResult>(`/profiles/${profileId}/privacy`, token, {
     method: "DELETE",
+  });
+}
+
+export function addGitHubSource(token: string, profileId: string, usernameOrUrl: string) {
+  return request<GitHubSourceResult>(`/profiles/${profileId}/sources/github`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username_or_url: usernameOrUrl }),
   });
 }

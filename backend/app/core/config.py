@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     ai_provider: str | None = None
     ai_model: str | None = None
+    github_token: str | None = None
 
     @property
     def cors_origins(self) -> list[str]:

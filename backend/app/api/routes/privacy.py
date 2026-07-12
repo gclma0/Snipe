@@ -32,7 +32,7 @@ def delete_profile_data(
     except SupabaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Supabase operation failed.",
+            detail=f"Supabase {exc.operation} failed.",
         ) from exc
 
     return ProfileDeletionResponse(

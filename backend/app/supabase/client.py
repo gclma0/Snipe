@@ -7,7 +7,9 @@ from app.core.config import Settings
 
 
 class SupabaseError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, operation: str = "supabase") -> None:
+        super().__init__(message)
+        self.operation = operation
 
 
 class SupabaseClient:
@@ -38,7 +40,10 @@ class SupabaseClient:
                 },
             )
         if response.status_code >= 400:
-            raise SupabaseError(f"Profile ownership check failed: {response.text[:300]}")
+            raise SupabaseError(
+                f"Profile ownership check failed: {response.text[:300]}",
+                operation="ownership_check",
+            )
         return bool(response.json())
 
     def upload_document(
@@ -219,7 +224,10 @@ class SupabaseClient:
                 },
             )
         if response.status_code >= 400:
-            raise SupabaseError(f"Storage path list failed: {response.text[:300]}")
+            raise SupabaseError(
+                f"Storage path list failed: {response.text[:300]}",
+                operation="storage_path_list",
+            )
         return [row["storage_path"] for row in response.json() if row.get("storage_path")]
 
     def delete_storage_objects(self, paths: list[str]) -> None:
@@ -234,8 +242,13 @@ class SupabaseClient:
                 },
                 json={"prefixes": paths},
             )
+        if response.status_code == 404:
+            return
         if response.status_code >= 400:
-            raise SupabaseError(f"Storage object delete failed: {response.text[:300]}")
+            raise SupabaseError(
+                f"Storage object delete failed: {response.text[:300]}",
+                operation="storage_delete",
+            )
 
     def delete_candidate_profile(self, profile_id: str, user_id: str) -> bool:
         with httpx.Client(timeout=15, trust_env=False) as client:
@@ -248,7 +261,10 @@ class SupabaseClient:
                 params={"id": f"eq.{profile_id}", "user_id": f"eq.{user_id}"},
             )
         if response.status_code >= 400:
-            raise SupabaseError(f"Profile delete failed: {response.text[:300]}")
+            raise SupabaseError(
+                f"Profile delete failed: {response.text[:300]}",
+                operation="profile_delete",
+            )
         return bool(response.json())
 
     def list_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:

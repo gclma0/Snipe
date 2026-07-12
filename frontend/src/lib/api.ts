@@ -20,6 +20,25 @@ export type ResumeUploadResult = {
   text_length: number;
   page_count: number | null;
   paragraph_count: number | null;
+  profile_version: number | null;
+  evidence_count: number;
+  normalized_profile_updated: boolean;
+};
+
+export type ResumeQualityFinding = {
+  code: string;
+  severity: "info" | "low" | "medium" | "high";
+  title: string;
+  detail: string;
+  recommendation: string;
+};
+
+export type ResumeQualityResult = {
+  analysis_type: string;
+  deterministic_version: string;
+  score: number;
+  findings: ResumeQualityFinding[];
+  checks: Record<string, boolean>;
 };
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
@@ -59,5 +78,11 @@ export function uploadResume(token: string, profileId: string, file: File) {
   return request<ResumeUploadResult>(`/profiles/${profileId}/sources/resume`, token, {
     method: "POST",
     body,
+  });
+}
+
+export function runResumeQualityAnalysis(token: string, profileId: string) {
+  return request<ResumeQualityResult>(`/profiles/${profileId}/analyses/resume-quality`, token, {
+    method: "POST",
   });
 }

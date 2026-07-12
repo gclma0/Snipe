@@ -1,10 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileUp, Plus } from "lucide-react";
+import { FileUp, Gauge, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { CandidateProfile, ResumeUploadResult, createProfile, uploadResume } from "@/lib/api";
+import {
+  CandidateProfile,
+  ResumeQualityResult,
+  ResumeUploadResult,
+  createProfile,
+  runResumeQualityAnalysis,
+  uploadResume,
+} from "@/lib/api";
 
 const profileSchema = z.object({
   career_goal: z.string().min(1, "Career goal is required.").max(120),
@@ -20,6 +27,7 @@ type ResumeWorkflowProps = {
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
+  const [qualityResult, setQualityResult] = useState<ResumeQualityResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -42,6 +50,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const created = await createProfile(accessToken, values);
       setProfile(created);
       setUploadResult(null);
+      setQualityResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -61,12 +70,31 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await uploadResume(accessToken, profile.id, file);
       setUploadResult(result);
+      setQualityResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleRunAnalysis() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await runResumeQualityAnalysis(accessToken, profile.id);
+      setQualityResult(result);
+      setMessage("Resume quality analysis completed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not run resume analysis.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -121,7 +149,39 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <dt className="font-medium">Text length</dt>
                 <dd className="text-muted-foreground">{uploadResult.text_length}</dd>
               </div>
+              <div>
+                <dt className="font-medium">Evidence records</dt>
+                <dd className="text-muted-foreground">{uploadResult.evidence_count}</dd>
+              </div>
+              <div>
+                <dt className="font-medium">Profile version</dt>
+                <dd className="text-muted-foreground">{uploadResult.profile_version ?? "Pending"}</dd>
+              </div>
+              <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunAnalysis}>
+                <Gauge aria-hidden="true" className="h-4 w-4" />
+                Run resume quality analysis
+              </button>
             </dl>
+          ) : null}
+          {qualityResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Resume quality</h3>
+                <p className="text-2xl font-semibold">{qualityResult.score}</p>
+              </div>
+              {qualityResult.findings.length ? (
+                <ul className="mt-4 space-y-3">
+                  {qualityResult.findings.slice(0, 4).map((finding) => (
+                    <li key={finding.code} className="border border-border p-3">
+                      <p className="font-medium">{finding.title}</p>
+                      <p className="mt-1 text-muted-foreground">{finding.recommendation}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-muted-foreground">No major resume quality issues found.</p>
+              )}
+            </div>
           ) : null}
         </>
       )}

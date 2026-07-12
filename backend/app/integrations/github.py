@@ -53,14 +53,14 @@ class GitHubClient:
             if user_response.status_code == 404:
                 raise GitHubLookupError("GitHub user not found.")
             if user_response.status_code >= 400:
-                raise GitHubLookupError("GitHub profile fetch failed.")
+                raise GitHubLookupError(_github_error_message(user_response, "profile"))
 
             repos_response = client.get(
                 f"https://api.github.com/users/{username}/repos",
                 params={"sort": "updated", "per_page": "12", "type": "owner"},
             )
             if repos_response.status_code >= 400:
-                raise GitHubLookupError("GitHub repository fetch failed.")
+                raise GitHubLookupError(_github_error_message(repos_response, "repository"))
 
             user = user_response.json()
             repos = [
@@ -131,3 +131,9 @@ def _path_exists(client: httpx.Client, owner: str | None, repo: str | None, path
         return False
     response = client.get(f"https://api.github.com/repos/{owner}/{repo}/contents/{path}")
     return response.status_code == 200
+
+
+def _github_error_message(response: httpx.Response, resource: str) -> str:
+    if response.status_code == 403 and response.headers.get("x-ratelimit-remaining") == "0":
+        return "GitHub API rate limit reached. Add GITHUB_TOKEN to the backend environment."
+    return f"GitHub {resource} fetch failed with status {response.status_code}."

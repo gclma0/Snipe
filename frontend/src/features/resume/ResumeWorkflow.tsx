@@ -7,12 +7,14 @@ import {
   GitCompareArrows,
   LayoutDashboard,
   Plus,
+  ScrollText,
 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import {
+  BasicReportResult,
   CandidateProfile,
   DeterministicScoreResult,
   JobDescriptionResult,
@@ -20,6 +22,7 @@ import {
   ResumeQualityResult,
   ResumeUploadResult,
   SkillGapResult,
+  createBasicReport,
   createJobDescription,
   createProfile,
   runAtsReadinessAnalysis,
@@ -55,6 +58,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
+  const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -89,6 +93,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
+      setReportResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -109,6 +114,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobResult(result);
       setSkillGapResult(null);
       setDashboardResult(null);
+      setReportResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -133,12 +139,31 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCompletenessResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
+      setReportResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleCreateReport() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createBasicReport(accessToken, profile.id, jobResult?.id ?? null);
+      setReportResult(result);
+      setMessage("Basic report generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate report.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -289,6 +314,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
                 Run readiness dashboard
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateReport}>
+                <ScrollText aria-hidden="true" className="h-4 w-4" />
+                Generate basic report
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -376,6 +405,23 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <JobField label="Primary specialization" values={dashboardResult.interpretation.primary_specialization ? [dashboardResult.interpretation.primary_specialization.name] : []} />
                 <JobField label="Estimated seniority" values={dashboardResult.interpretation.estimated_seniority ? [dashboardResult.interpretation.estimated_seniority] : []} />
               </dl>
+            </div>
+          ) : null}
+          {reportResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">{reportResult.title}</h3>
+                <p className="text-2xl font-semibold">{reportResult.readiness.scores.overall}</p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{reportResult.summary}</p>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Strengths" values={reportResult.strengths.slice(0, 3)} />
+                <JobField label="Improvement areas" values={reportResult.weaknesses.slice(0, 3)} />
+                <JobField label="Skill gaps" values={reportResult.skill_gaps.slice(0, 6)} />
+              </dl>
+              <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
+                {reportResult.markdown}
+              </pre>
             </div>
           ) : null}
         </>

@@ -114,6 +114,18 @@ export type ReadinessDashboardResult = {
   checks: Record<string, boolean>;
 };
 
+export type BasicReportResult = {
+  report_type: string;
+  report_version: string;
+  title: string;
+  summary: string;
+  readiness: ReadinessDashboardResult;
+  strengths: string[];
+  weaknesses: string[];
+  skill_gaps: string[];
+  markdown: string;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -198,6 +210,20 @@ export function runReadinessDashboard(
   jobDescriptionId?: string | null,
 ) {
   return request<ReadinessDashboardResult>(`/profiles/${profileId}/analyses/readiness-dashboard`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function createBasicReport(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+) {
+  return request<BasicReportResult>(`/profiles/${profileId}/reports/basic`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

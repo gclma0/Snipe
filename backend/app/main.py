@@ -6,6 +6,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.job_descriptions import router as job_descriptions_router
 from app.api.routes.profiles import router as profiles_router
+from app.api.routes.reports import router as reports_router
 from app.api.routes.sources import router as sources_router
 from app.core.config import Settings, get_settings
 
@@ -32,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sources_router, prefix="/api/v1")
     app.include_router(analyses_router, prefix="/api/v1")
     app.include_router(job_descriptions_router, prefix="/api/v1")
+    app.include_router(reports_router, prefix="/api/v1")
     return app
 
 

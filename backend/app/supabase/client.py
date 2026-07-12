@@ -190,6 +190,22 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else None
 
+    def create_generated_output(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/generated_outputs",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Generated output insert failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else payload
+
     def list_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

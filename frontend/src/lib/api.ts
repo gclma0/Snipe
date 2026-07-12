@@ -43,6 +43,29 @@ export type ResumeQualityResult = {
 
 export type DeterministicScoreResult = ResumeQualityResult;
 
+export type StructuredJobDescription = {
+  parser_version: string;
+  title: string | null;
+  company: string | null;
+  required_skills: string[];
+  preferred_skills: string[];
+  tools: string[];
+  soft_skills: string[];
+  responsibilities: string[];
+  education: string[];
+  experience_requirements: string[];
+  seniority: string | null;
+  ats_keywords: string[];
+};
+
+export type JobDescriptionResult = {
+  id: string | null;
+  profile_id: string;
+  source_type: string;
+  input_hash: string;
+  structured: StructuredJobDescription;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -98,5 +121,15 @@ export function runAtsReadinessAnalysis(token: string, profileId: string) {
 export function runProfileCompletenessAnalysis(token: string, profileId: string) {
   return request<DeterministicScoreResult>(`/profiles/${profileId}/analyses/profile-completeness`, token, {
     method: "POST",
+  });
+}
+
+export function createJobDescription(token: string, profileId: string, text: string) {
+  return request<JobDescriptionResult>(`/profiles/${profileId}/job-descriptions`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
   });
 }

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ClipboardCheck, FileUp, Gauge, Plus } from "lucide-react";
+import { BriefcaseBusiness, ClipboardCheck, FileUp, Gauge, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -7,8 +7,10 @@ import { z } from "zod";
 import {
   CandidateProfile,
   DeterministicScoreResult,
+  JobDescriptionResult,
   ResumeQualityResult,
   ResumeUploadResult,
+  createJobDescription,
   createProfile,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
@@ -21,7 +23,12 @@ const profileSchema = z.object({
   preferred_role: z.string().min(1, "Preferred role is required.").max(120),
 });
 
+const jobDescriptionSchema = z.object({
+  text: z.string().min(100, "Paste at least 100 characters from the job description.").max(60000),
+});
+
 type ProfileValues = z.infer<typeof profileSchema>;
+type JobDescriptionValues = z.infer<typeof jobDescriptionSchema>;
 
 type ResumeWorkflowProps = {
   accessToken: string | null;
@@ -33,6 +40,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [qualityResult, setQualityResult] = useState<ResumeQualityResult | null>(null);
   const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
+  const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -40,6 +48,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     defaultValues: {
       career_goal: "Prepare for a target role",
       preferred_role: "",
+    },
+  });
+  const jobForm = useForm<JobDescriptionValues>({
+    resolver: zodResolver(jobDescriptionSchema),
+    defaultValues: {
+      text: "",
     },
   });
 
@@ -58,9 +72,28 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setQualityResult(null);
       setAtsResult(null);
       setCompletenessResult(null);
+      setJobResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateJobDescription(values: JobDescriptionValues) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createJobDescription(accessToken, profile.id, values.text);
+      setJobResult(result);
+      setMessage("Job description analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
     } finally {
       setIsBusy(false);
     }
@@ -227,10 +260,43 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               </div>
             </div>
           ) : null}
+          {profile ? (
+            <form className="mt-5 border-t border-border pt-5" onSubmit={jobForm.handleSubmit(handleCreateJobDescription)}>
+              <h3 className="text-base font-semibold">Target job description</h3>
+              <textarea className="mt-3 min-h-36 w-full border border-border px-3 py-2 text-sm" placeholder="Paste a target job description here." {...jobForm.register("text")} />
+              {jobForm.formState.errors.text ? <p className="mt-2 text-sm text-red-600">{jobForm.formState.errors.text.message}</p> : null}
+              <button className="mt-3 inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
+                <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
+                Analyze job description
+              </button>
+            </form>
+          ) : null}
+          {jobResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <h3 className="text-base font-semibold">{jobResult.structured.title ?? "Target role"}</h3>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Company" values={jobResult.structured.company ? [jobResult.structured.company] : []} />
+                <JobField label="Seniority" values={jobResult.structured.seniority ? [jobResult.structured.seniority] : []} />
+                <JobField label="Required skills" values={jobResult.structured.required_skills} />
+                <JobField label="Preferred skills" values={jobResult.structured.preferred_skills} />
+                <JobField label="Tools" values={jobResult.structured.tools} />
+                <JobField label="ATS keywords" values={jobResult.structured.ats_keywords.slice(0, 8)} />
+              </dl>
+            </div>
+          ) : null}
         </>
       )}
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
+  );
+}
+
+function JobField({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div>
+      <dt className="font-medium">{label}</dt>
+      <dd className="mt-1 text-muted-foreground">{values.length ? values.join(", ") : "Not found"}</dd>
+    </div>
   );
 }
 

@@ -29,6 +29,7 @@ import {
   PortfolioSourceResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
+  ResumeRewriteResult,
   ResumeUploadResult,
   SkillGapResult,
   addGitHubSource,
@@ -37,6 +38,7 @@ import {
   createAIReadinessInterpretation,
   createBasicReport,
   createJobDescription,
+  createResumeRewriteSuggestions,
   createProfile,
   deleteProfileData,
   runAtsReadinessAnalysis,
@@ -93,6 +95,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
+  const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -150,6 +153,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
+      setRewriteResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -172,6 +176,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
+      setRewriteResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -275,6 +280,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
+      setRewriteResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -306,6 +312,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
+      setRewriteResult(null);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -345,6 +352,24 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "AI interpretation loaded from cache." : "AI interpretation generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate AI interpretation.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateRewriteSuggestions() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createResumeRewriteSuggestions(accessToken, profile.id, jobResult?.id ?? null);
+      setRewriteResult(result);
+      setMessage(result.cached ? "Rewrite suggestions loaded from cache." : "Rewrite suggestions generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate rewrite suggestions.");
     } finally {
       setIsBusy(false);
     }
@@ -593,6 +618,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <Sparkles aria-hidden="true" className="h-4 w-4" />
                 Generate AI interpretation
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateRewriteSuggestions}>
+                <ScrollText aria-hidden="true" className="h-4 w-4" />
+                Generate rewrite suggestions
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -721,6 +750,39 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               {aiInterpretationResult.cautions.length ? (
                 <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
                   {aiInterpretationResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {rewriteResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Rewrite suggestions</h3>
+                <p className="text-xs text-muted-foreground">
+                  {rewriteResult.cached ? "Cached" : rewriteResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{rewriteResult.summary}</p>
+              <div className="mt-4 grid gap-3">
+                {rewriteResult.suggestions.map((item) => (
+                  <div key={`${item.original}-${item.suggested}`} className="border border-border p-3">
+                    <p className="font-medium">Original</p>
+                    <p className="mt-1 text-muted-foreground">{item.original}</p>
+                    <p className="mt-3 font-medium">Suggested</p>
+                    <p className="mt-1">{item.suggested}</p>
+                    <p className="mt-3 text-muted-foreground">{item.rationale}</p>
+                    <JobField label="Evidence used" values={item.evidence_used} />
+                    {item.needs_candidate_value ? (
+                      <p className="mt-2 text-muted-foreground">Candidate review required before use.</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              {rewriteResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {rewriteResult.cautions.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>

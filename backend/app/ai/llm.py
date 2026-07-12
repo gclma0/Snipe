@@ -26,6 +26,25 @@ class AIInterpretationResult(BaseModel):
     cached: bool = False
 
 
+class ResumeRewriteSuggestion(BaseModel):
+    original: str
+    suggested: str
+    rationale: str
+    evidence_used: list[str] = Field(default_factory=list, max_length=6)
+    needs_candidate_value: bool = False
+
+
+class ResumeRewriteResult(BaseModel):
+    output_type: str = "ai_resume_rewrite_suggestions"
+    output_version: str = "ai-resume-rewrite-suggestions-v1"
+    provider: str
+    model_name: str
+    summary: str
+    suggestions: list[ResumeRewriteSuggestion] = Field(default_factory=list, max_length=5)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class AIProviderError(RuntimeError):
     pass
 
@@ -41,6 +60,13 @@ class AIClient:
             return _local_template_interpretation(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._openai_compatible_interpretation(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_resume_rewrite_suggestions(self, context: dict[str, Any]) -> ResumeRewriteResult:
+        if self.provider == "local_template":
+            return _local_template_resume_rewrite(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._openai_compatible_resume_rewrite(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
@@ -97,6 +123,63 @@ class AIClient:
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise AIProviderError("AI provider returned an invalid structured response.") from exc
 
+    def _openai_compatible_resume_rewrite(self, context: dict[str, Any]) -> ResumeRewriteResult:
+        parsed = self._openai_compatible_json(
+            task=(
+                "Create evidence-bound resume rewrite suggestions. Do not invent metrics, "
+                "achievements, employers, skills, or experience. If a stronger bullet needs a "
+                "real metric, use a bracketed placeholder and set needs_candidate_value true."
+            ),
+            context=context,
+        )
+        try:
+            return ResumeRewriteResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def _openai_compatible_json(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
+        if not self.settings.ai_api_key:
+            raise AIProviderError("AI_API_KEY is required for the configured AI provider.")
+        base_url = (self.settings.ai_base_url or "https://api.openai.com/v1").rstrip("/")
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Snipe, a career assistant. Use only the compact structured "
+                        "context provided. Do not invent achievements, metrics, skills, "
+                        "employers, credentials, or experience. Return strict JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps({"task": task, "context": context}, sort_keys=True),
+                },
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        with httpx.Client(timeout=self.settings.ai_timeout_seconds, trust_env=False) as client:
+            response = client.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.ai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise AIProviderError(f"AI provider request failed with status {response.status_code}.")
+        try:
+            return json.loads(response.json()["choices"][0]["message"]["content"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AIProviderError("AI provider returned invalid JSON.") from exc
+
 
 def _local_template_interpretation(context: dict[str, Any]) -> AIInterpretationResult:
     readiness = context["readiness"]
@@ -149,6 +232,56 @@ def _local_template_interpretation(context: dict[str, Any]) -> AIInterpretationR
             (
                 "Do not add skills, metrics, or achievements unless they are supported by "
                 "real evidence."
+            )
+        ],
+    )
+
+
+def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResult:
+    bullets = context.get("existing_bullets") or []
+    verified_skills = context.get("verified_skills") or []
+    skill_gap = context.get("skill_gap") or {}
+    matched = set(skill_gap.get("matched") or [])
+    suggestions: list[ResumeRewriteSuggestion] = []
+    for bullet in bullets[:3]:
+        evidence = sorted(set(verified_skills[:6]) & matched) or verified_skills[:3]
+        if evidence:
+            suggested = f"{bullet.rstrip('.')} using {', '.join(evidence[:3])}."
+        else:
+            suggested = bullet
+        suggestions.append(
+            ResumeRewriteSuggestion(
+                original=bullet,
+                suggested=suggested,
+                rationale=(
+                    "This keeps the original claim but makes verified skills easier to scan."
+                ),
+                evidence_used=evidence[:3],
+                needs_candidate_value=False,
+            )
+        )
+    if not suggestions and verified_skills:
+        suggestions.append(
+            ResumeRewriteSuggestion(
+                original="No rewriteable experience bullet was found.",
+                suggested=(
+                    "Add a real experience bullet that demonstrates "
+                    f"{', '.join(verified_skills[:3])}."
+                ),
+                rationale="Snipe needs an existing fact before it can safely rewrite a bullet.",
+                evidence_used=verified_skills[:3],
+                needs_candidate_value=True,
+            )
+        )
+    return ResumeRewriteResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary="Rewrite suggestions are based only on compact extracted resume evidence.",
+        suggestions=suggestions,
+        cautions=[
+            (
+                "Review every suggestion before use and replace placeholders only with true, "
+                "verifiable details."
             )
         ],
     )

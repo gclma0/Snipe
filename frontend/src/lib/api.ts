@@ -145,6 +145,25 @@ export type AIInterpretationResult = {
   cached: boolean;
 };
 
+export type ResumeRewriteSuggestion = {
+  original: string;
+  suggested: string;
+  rationale: string;
+  evidence_used: string[];
+  needs_candidate_value: boolean;
+};
+
+export type ResumeRewriteResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  suggestions: ResumeRewriteSuggestion[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ProfileDeletionResult = {
   profile_id: string;
   deleted: boolean;
@@ -306,6 +325,24 @@ export function createAIReadinessInterpretation(
   forceRegenerate = false,
 ) {
   return request<AIInterpretationResult>(`/profiles/${profileId}/ai/readiness-interpretation`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      force_regenerate: forceRegenerate,
+    }),
+  });
+}
+
+export function createResumeRewriteSuggestions(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<ResumeRewriteResult>(`/profiles/${profileId}/ai/resume-rewrite-suggestions`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

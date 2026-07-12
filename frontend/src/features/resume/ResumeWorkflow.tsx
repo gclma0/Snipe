@@ -7,6 +7,8 @@ import {
   Github,
   GitCompareArrows,
   LayoutDashboard,
+  Linkedin,
+  LinkIcon,
   Plus,
   ScrollText,
   Trash2,
@@ -21,11 +23,15 @@ import {
   DeterministicScoreResult,
   GitHubSourceResult,
   JobDescriptionResult,
+  LinkedInSourceResult,
+  PortfolioSourceResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
   ResumeUploadResult,
   SkillGapResult,
   addGitHubSource,
+  addLinkedInTextSource,
+  addPortfolioSource,
   createBasicReport,
   createJobDescription,
   createProfile,
@@ -35,6 +41,7 @@ import {
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
+  uploadLinkedInSource,
   uploadResume,
 } from "@/lib/api";
 
@@ -51,9 +58,19 @@ const githubSchema = z.object({
   username_or_url: z.string().min(1, "GitHub username or URL is required.").max(120),
 });
 
+const portfolioSchema = z.object({
+  url: z.string().min(1, "Portfolio URL is required.").max(500),
+});
+
+const linkedInSchema = z.object({
+  text: z.string().min(50, "Paste at least 50 characters from LinkedIn.").max(60000),
+});
+
 type ProfileValues = z.infer<typeof profileSchema>;
 type JobDescriptionValues = z.infer<typeof jobDescriptionSchema>;
 type GitHubValues = z.infer<typeof githubSchema>;
+type PortfolioValues = z.infer<typeof portfolioSchema>;
+type LinkedInValues = z.infer<typeof linkedInSchema>;
 
 type ResumeWorkflowProps = {
   accessToken: string | null;
@@ -67,6 +84,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
   const [githubResult, setGithubResult] = useState<GitHubSourceResult | null>(null);
+  const [portfolioResult, setPortfolioResult] = useState<PortfolioSourceResult | null>(null);
+  const [linkedInResult, setLinkedInResult] = useState<LinkedInSourceResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
@@ -91,6 +110,18 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       username_or_url: "",
     },
   });
+  const portfolioForm = useForm<PortfolioValues>({
+    resolver: zodResolver(portfolioSchema),
+    defaultValues: {
+      url: "",
+    },
+  });
+  const linkedInForm = useForm<LinkedInValues>({
+    resolver: zodResolver(linkedInSchema),
+    defaultValues: {
+      text: "",
+    },
+  });
 
   async function handleCreateProfile(values: ProfileValues) {
     if (!accessToken) {
@@ -109,6 +140,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCompletenessResult(null);
       setJobResult(null);
       setGithubResult(null);
+      setPortfolioResult(null);
+      setLinkedInResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -159,6 +192,62 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleAddPortfolio(values: PortfolioValues) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await addPortfolioSource(accessToken, profile.id, values.url);
+      setPortfolioResult(result);
+      setMessage("Portfolio source analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not analyze portfolio source.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleAddLinkedInText(values: LinkedInValues) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await addLinkedInTextSource(accessToken, profile.id, values.text);
+      setLinkedInResult(result);
+      setMessage("LinkedIn source analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not analyze LinkedIn source.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleUploadLinkedIn(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await uploadLinkedInSource(accessToken, profile.id, file);
+      setLinkedInResult(result);
+      setMessage("LinkedIn upload analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not upload LinkedIn file.");
+    } finally {
+      setIsBusy(false);
+      event.target.value = "";
+    }
+  }
+
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !accessToken || !profile) {
@@ -174,6 +263,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setGithubResult(null);
+      setPortfolioResult(null);
+      setLinkedInResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -202,6 +293,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCompletenessResult(null);
       setJobResult(null);
       setGithubResult(null);
+      setPortfolioResult(null);
+      setLinkedInResult(null);
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
@@ -368,6 +461,63 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <JobField label="Test signals" values={[String(githubResult.test_signal_count)]} />
                 <JobField label="CI signals" values={[String(githubResult.ci_signal_count)]} />
                 <JobField label="Notable repositories" values={githubResult.notable_repositories.slice(0, 4)} />
+              </dl>
+            </div>
+          ) : null}
+          {profile ? (
+            <form className="mt-5 border-t border-border pt-5" onSubmit={portfolioForm.handleSubmit(handleAddPortfolio)}>
+              <h3 className="text-base font-semibold">Optional portfolio source</h3>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <input className="w-full border border-border px-3 py-2 text-sm" placeholder="https://your-portfolio.com" {...portfolioForm.register("url")} />
+                <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
+                  <LinkIcon aria-hidden="true" className="h-4 w-4" />
+                  Analyze portfolio
+                </button>
+              </div>
+              {portfolioForm.formState.errors.url ? <p className="mt-2 text-sm text-red-600">{portfolioForm.formState.errors.url.message}</p> : null}
+            </form>
+          ) : null}
+          {portfolioResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <h3 className="text-base font-semibold">Portfolio analysis</h3>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Title" values={portfolioResult.title ? [portfolioResult.title] : []} />
+                <JobField label="Technical signals" values={portfolioResult.technical_signals} />
+                <JobField label="Non-technical signals" values={portfolioResult.non_technical_signals} />
+                <JobField label="Project signals" values={[String(portfolioResult.project_signal_count)]} />
+                <JobField label="Contact signals" values={[String(portfolioResult.contact_signal_count)]} />
+                <JobField label="Evidence records" values={[String(portfolioResult.evidence_count)]} />
+              </dl>
+            </div>
+          ) : null}
+          {profile ? (
+            <form className="mt-5 border-t border-border pt-5" onSubmit={linkedInForm.handleSubmit(handleAddLinkedInText)}>
+              <h3 className="text-base font-semibold">Optional LinkedIn source</h3>
+              <textarea className="mt-3 min-h-32 w-full border border-border px-3 py-2 text-sm" placeholder="Paste LinkedIn profile text or export content. Direct LinkedIn scraping is not supported." {...linkedInForm.register("text")} />
+              {linkedInForm.formState.errors.text ? <p className="mt-2 text-sm text-red-600">{linkedInForm.formState.errors.text.message}</p> : null}
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
+                  <Linkedin aria-hidden="true" className="h-4 w-4" />
+                  Analyze pasted text
+                </button>
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium">
+                  <FileUp aria-hidden="true" className="h-4 w-4" />
+                  Upload PDF/DOCX
+                  <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleUploadLinkedIn} />
+                </label>
+              </div>
+            </form>
+          ) : null}
+          {linkedInResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <h3 className="text-base font-semibold">LinkedIn analysis</h3>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Headline" values={linkedInResult.headline ? [linkedInResult.headline] : []} />
+                <JobField label="Source type" values={[linkedInResult.source_type]} />
+                <JobField label="Skill signals" values={linkedInResult.skill_signals} />
+                <JobField label="Experience items" values={[String(linkedInResult.experience_count)]} />
+                <JobField label="Evidence records" values={[String(linkedInResult.evidence_count)]} />
+                <JobField label="Profile version" values={[String(linkedInResult.profile_version ?? "Pending")]} />
               </dl>
             </div>
           ) : null}

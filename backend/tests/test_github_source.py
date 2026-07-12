@@ -87,9 +87,9 @@ class FakeSupabaseClient:
 
 
 def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClient:
-    import app.api.routes.sources as sources
+    import app.api.routes.source_github as source_github
 
-    monkeypatch.setattr(sources, "GitHubClient", FakeGitHubClient)
+    monkeypatch.setattr(source_github, "GitHubClient", FakeGitHubClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
         id=TEST_USER_ID,

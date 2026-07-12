@@ -148,6 +148,32 @@ export type GitHubSourceResult = {
   profile_version: number | null;
 };
 
+export type PortfolioSourceResult = {
+  source_id: string | null;
+  profile_id: string;
+  url: string;
+  status: string;
+  title: string | null;
+  technical_signals: string[];
+  non_technical_signals: string[];
+  project_signal_count: number;
+  contact_signal_count: number;
+  evidence_count: number;
+  profile_version: number | null;
+};
+
+export type LinkedInSourceResult = {
+  source_id: string | null;
+  profile_id: string;
+  source_type: string;
+  status: string;
+  headline: string | null;
+  skill_signals: string[];
+  experience_count: number;
+  evidence_count: number;
+  profile_version: number | null;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -267,5 +293,34 @@ export function addGitHubSource(token: string, profileId: string, usernameOrUrl:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ username_or_url: usernameOrUrl }),
+  });
+}
+
+export function addPortfolioSource(token: string, profileId: string, url: string) {
+  return request<PortfolioSourceResult>(`/profiles/${profileId}/sources/portfolio`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function addLinkedInTextSource(token: string, profileId: string, text: string) {
+  return request<LinkedInSourceResult>(`/profiles/${profileId}/sources/linkedin`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
+}
+
+export function uploadLinkedInSource(token: string, profileId: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  return request<LinkedInSourceResult>(`/profiles/${profileId}/sources/linkedin/upload`, token, {
+    method: "POST",
+    body,
   });
 }

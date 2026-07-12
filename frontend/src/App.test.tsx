@@ -8,5 +8,6 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: /AI Career Intelligence Platform/i })).toBeInTheDocument();
+    expect(screen.getByText(/Authentication is ready to configure/i)).toBeInTheDocument();
   });
 });

@@ -76,6 +76,7 @@ Deployment:
 - `docs/API_SPEC.md`: initial API surface and endpoint responsibilities.
 - `docs/DEVELOPMENT_PLAN.md`: sequential milestones with acceptance criteria.
 - `docs/DECISIONS.md`: architectural decisions and reasons.
+- `docs/LOCAL_DEVELOPMENT.md`: local install, run, and verification commands.
 
 ## Development Guidance
 

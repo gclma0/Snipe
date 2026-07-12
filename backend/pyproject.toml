@@ -5,6 +5,7 @@ description = "FastAPI backend for the AI Career Intelligence Platform."
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.116.0",
+  "PyJWT>=2.10.0",
   "pydantic>=2.8.0",
   "pydantic-settings>=2.4.0",
   "uvicorn[standard]>=0.30.0",
@@ -20,6 +21,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = ["-p", "no:cacheprovider"]
 
 [tool.ruff]
 line-length = 100

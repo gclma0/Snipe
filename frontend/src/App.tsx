@@ -1,5 +1,7 @@
 import { Activity } from "lucide-react";
 
+import { AuthPanel } from "@/features/auth/AuthPanel";
+
 export function App() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -18,6 +20,7 @@ export function App() {
             Frontend tooling is ready. Product workflows begin in later milestones after
             authentication, storage, and the normalized candidate profile are in place.
           </p>
+          <AuthPanel />
         </div>
       </section>
     </main>

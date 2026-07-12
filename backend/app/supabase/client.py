@@ -234,8 +234,9 @@ class SupabaseClient:
         if not paths:
             return
         with httpx.Client(timeout=30, trust_env=False) as client:
-            response = client.post(
-                f"{self.base_url}/storage/v1/object/{self.storage_bucket}/remove",
+            response = client.request(
+                "DELETE",
+                f"{self.base_url}/storage/v1/object/{self.storage_bucket}",
                 headers={
                     **self.headers,
                     "Content-Type": "application/json",

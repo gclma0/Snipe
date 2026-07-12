@@ -35,7 +35,7 @@ def test_auth_me_rejects_missing_token() -> None:
 
 
 def test_auth_me_rejects_unconfigured_jwt_secret() -> None:
-    app = create_app(Settings(supabase_jwt_secret=None))
+    app = create_app(Settings(supabase_url=None, supabase_jwt_secret=None))
     client = TestClient(app)
     token = create_token(TEST_SECRET)
 
@@ -46,7 +46,7 @@ def test_auth_me_rejects_unconfigured_jwt_secret() -> None:
 
 def test_auth_me_returns_authenticated_user() -> None:
     secret = TEST_SECRET
-    app = create_app(Settings(supabase_jwt_secret=secret))
+    app = create_app(Settings(supabase_url=None, supabase_jwt_secret=secret))
     client = TestClient(app)
     token = create_token(secret)
 

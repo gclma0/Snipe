@@ -206,6 +206,51 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def list_profile_storage_paths(self, profile_id: str, user_id: str) -> list[str]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/profile_sources",
+                headers=self.headers,
+                params={
+                    "select": "storage_path",
+                    "profile_id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                    "storage_path": "not.is.null",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Storage path list failed: {response.text[:300]}")
+        return [row["storage_path"] for row in response.json() if row.get("storage_path")]
+
+    def delete_storage_objects(self, paths: list[str]) -> None:
+        if not paths:
+            return
+        with httpx.Client(timeout=30, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/storage/v1/object/{self.storage_bucket}/remove",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                },
+                json={"prefixes": paths},
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Storage object delete failed: {response.text[:300]}")
+
+    def delete_candidate_profile(self, profile_id: str, user_id: str) -> bool:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.delete(
+                f"{self.base_url}/rest/v1/candidate_profiles",
+                headers={
+                    **self.headers,
+                    "Prefer": "return=representation",
+                },
+                params={"id": f"eq.{profile_id}", "user_id": f"eq.{user_id}"},
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Profile delete failed: {response.text[:300]}")
+        return bool(response.json())
+
     def list_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

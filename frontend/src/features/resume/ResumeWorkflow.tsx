@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Plus,
   ScrollText,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -25,6 +26,7 @@ import {
   createBasicReport,
   createJobDescription,
   createProfile,
+  deleteProfileData,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
   runReadinessDashboard,
@@ -146,6 +148,32 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleDeleteProfile() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      await deleteProfileData(accessToken, profile.id);
+      setProfile(null);
+      setUploadResult(null);
+      setQualityResult(null);
+      setAtsResult(null);
+      setCompletenessResult(null);
+      setJobResult(null);
+      setSkillGapResult(null);
+      setDashboardResult(null);
+      setReportResult(null);
+      setMessage("Profile data deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -274,6 +302,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 Upload resume
                 <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleUpload} />
               </label>
+              <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-red-200 px-4 py-2 text-sm font-medium text-red-700" disabled={isBusy} type="button" onClick={handleDeleteProfile}>
+                <Trash2 aria-hidden="true" className="h-4 w-4" />
+                Delete profile data
+              </button>
             </div>
           ) : null}
           {uploadResult ? (

@@ -126,6 +126,12 @@ export type BasicReportResult = {
   markdown: string;
 };
 
+export type ProfileDeletionResult = {
+  profile_id: string;
+  deleted: boolean;
+  deleted_storage_objects: number;
+};
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -229,5 +235,11 @@ export function createBasicReport(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function deleteProfileData(token: string, profileId: string) {
+  return request<ProfileDeletionResult>(`/profiles/${profileId}/privacy`, token, {
+    method: "DELETE",
   });
 }

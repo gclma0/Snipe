@@ -1,14 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileUp, Gauge, Plus } from "lucide-react";
+import { ClipboardCheck, FileUp, Gauge, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import {
   CandidateProfile,
+  DeterministicScoreResult,
   ResumeQualityResult,
   ResumeUploadResult,
   createProfile,
+  runAtsReadinessAnalysis,
+  runProfileCompletenessAnalysis,
   runResumeQualityAnalysis,
   uploadResume,
 } from "@/lib/api";
@@ -28,6 +31,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
   const [qualityResult, setQualityResult] = useState<ResumeQualityResult | null>(null);
+  const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
+  const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -51,6 +56,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setProfile(created);
       setUploadResult(null);
       setQualityResult(null);
+      setAtsResult(null);
+      setCompletenessResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -71,12 +78,36 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const result = await uploadResume(accessToken, profile.id, file);
       setUploadResult(result);
       setQualityResult(null);
+      setAtsResult(null);
+      setCompletenessResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
       setIsBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleRunReadinessScores() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const [ats, completeness] = await Promise.all([
+        runAtsReadinessAnalysis(accessToken, profile.id),
+        runProfileCompletenessAnalysis(accessToken, profile.id),
+      ]);
+      setAtsResult(ats);
+      setCompletenessResult(completeness);
+      setMessage("Readiness scores completed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not run readiness scores.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -161,6 +192,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <Gauge aria-hidden="true" className="h-4 w-4" />
                 Run resume quality analysis
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunReadinessScores}>
+                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                Run readiness scores
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -183,9 +218,34 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               )}
             </div>
           ) : null}
+          {atsResult || completenessResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <h3 className="text-base font-semibold">Readiness scores</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {atsResult ? <ScoreCard title="Snipe ATS Readiness" result={atsResult} /> : null}
+                {completenessResult ? <ScoreCard title="Profile Completeness" result={completenessResult} /> : null}
+              </div>
+            </div>
+          ) : null}
         </>
       )}
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
+  );
+}
+
+function ScoreCard({ title, result }: { title: string; result: DeterministicScoreResult }) {
+  const topFinding = result.findings[0];
+
+  return (
+    <div className="border border-border p-3">
+      <p className="font-medium">{title}</p>
+      <p className="mt-2 text-2xl font-semibold">{result.score}</p>
+      {topFinding ? (
+        <p className="mt-2 text-muted-foreground">{topFinding.recommendation}</p>
+      ) : (
+        <p className="mt-2 text-muted-foreground">No major readiness issues found.</p>
+      )}
+    </div>
   );
 }

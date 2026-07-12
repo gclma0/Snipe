@@ -41,6 +41,8 @@ export type ResumeQualityResult = {
   checks: Record<string, boolean>;
 };
 
+export type DeterministicScoreResult = ResumeQualityResult;
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     ...init,
@@ -83,6 +85,18 @@ export function uploadResume(token: string, profileId: string, file: File) {
 
 export function runResumeQualityAnalysis(token: string, profileId: string) {
   return request<ResumeQualityResult>(`/profiles/${profileId}/analyses/resume-quality`, token, {
+    method: "POST",
+  });
+}
+
+export function runAtsReadinessAnalysis(token: string, profileId: string) {
+  return request<DeterministicScoreResult>(`/profiles/${profileId}/analyses/ats-readiness`, token, {
+    method: "POST",
+  });
+}
+
+export function runProfileCompletenessAnalysis(token: string, profileId: string) {
+  return request<DeterministicScoreResult>(`/profiles/${profileId}/analyses/profile-completeness`, token, {
     method: "POST",
   });
 }

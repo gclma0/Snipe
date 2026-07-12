@@ -126,6 +126,25 @@ export type BasicReportResult = {
   markdown: string;
 };
 
+export type AIRecommendation = {
+  title: string;
+  rationale: string;
+  action: string;
+  priority: "high" | "medium" | "low";
+};
+
+export type AIInterpretationResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  readiness_explanation: string;
+  recommendations: AIRecommendation[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ProfileDeletionResult = {
   profile_id: string;
   deleted: boolean;
@@ -277,6 +296,24 @@ export function createBasicReport(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function createAIReadinessInterpretation(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<AIInterpretationResult>(`/profiles/${profileId}/ai/readiness-interpretation`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      force_regenerate: forceRegenerate,
+    }),
   });
 }
 

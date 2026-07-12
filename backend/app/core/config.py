@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     ai_provider: str | None = None
     ai_model: str | None = None
+    ai_api_key: str | None = None
+    ai_base_url: str | None = None
+    ai_timeout_seconds: int = Field(default=30, ge=1, le=120)
     github_token: str | None = None
 
     @property

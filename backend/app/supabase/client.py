@@ -16,6 +16,7 @@ class SupabaseClient:
     def __init__(self, settings: Settings) -> None:
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise SupabaseError("Supabase URL and service role key are required.")
+        self.settings = settings
         self.base_url = settings.supabase_url.rstrip("/")
         self.service_role_key = settings.supabase_service_role_key
         self.storage_bucket = settings.supabase_storage_bucket
@@ -210,6 +211,39 @@ class SupabaseClient:
             raise SupabaseError(f"Generated output insert failed: {response.text[:300]}")
         rows = response.json()
         return rows[0] if rows else payload
+
+    def get_generated_output(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        output_type: str,
+        input_hash: str,
+        job_description_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        params = {
+            "select": "id,result_json,result_markdown,provider,model_name,created_at",
+            "user_id": f"eq.{user_id}",
+            "profile_id": f"eq.{profile_id}",
+            "output_type": f"eq.{output_type}",
+            "input_hash": f"eq.{input_hash}",
+            "job_description_id": (
+                f"eq.{job_description_id}" if job_description_id else "is.null"
+            ),
+            "status": "eq.completed",
+            "order": "created_at.desc",
+            "limit": "1",
+        }
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/generated_outputs",
+                headers=self.headers,
+                params=params,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Generated output fetch failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
 
     def list_profile_storage_paths(self, profile_id: str, user_id: str) -> list[str]:
         with httpx.Client(timeout=15, trust_env=False) as client:

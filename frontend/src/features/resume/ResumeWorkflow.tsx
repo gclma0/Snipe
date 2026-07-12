@@ -11,6 +11,7 @@ import {
   LinkIcon,
   Plus,
   ScrollText,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -19,6 +20,7 @@ import { z } from "zod";
 
 import {
   BasicReportResult,
+  AIInterpretationResult,
   CandidateProfile,
   DeterministicScoreResult,
   GitHubSourceResult,
@@ -32,6 +34,7 @@ import {
   addGitHubSource,
   addLinkedInTextSource,
   addPortfolioSource,
+  createAIReadinessInterpretation,
   createBasicReport,
   createJobDescription,
   createProfile,
@@ -89,6 +92,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
+  const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -145,6 +149,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setAiInterpretationResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -166,6 +171,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setAiInterpretationResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -268,6 +274,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setAiInterpretationResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -298,6 +305,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setSkillGapResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setAiInterpretationResult(null);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -319,6 +327,24 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Basic report generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate report.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateAIInterpretation() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createAIReadinessInterpretation(accessToken, profile.id, jobResult?.id ?? null);
+      setAiInterpretationResult(result);
+      setMessage(result.cached ? "AI interpretation loaded from cache." : "AI interpretation generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate AI interpretation.");
     } finally {
       setIsBusy(false);
     }
@@ -563,6 +589,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Generate basic report
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateAIInterpretation}>
+                <Sparkles aria-hidden="true" className="h-4 w-4" />
+                Generate AI interpretation
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -667,6 +697,34 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
                 {reportResult.markdown}
               </pre>
+            </div>
+          ) : null}
+          {aiInterpretationResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">AI interpretation</h3>
+                <p className="text-xs text-muted-foreground">
+                  {aiInterpretationResult.cached ? "Cached" : aiInterpretationResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{aiInterpretationResult.summary}</p>
+              <p className="mt-3 text-muted-foreground">{aiInterpretationResult.readiness_explanation}</p>
+              <div className="mt-4 grid gap-3">
+                {aiInterpretationResult.recommendations.map((item) => (
+                  <div key={`${item.priority}-${item.title}`} className="border border-border p-3">
+                    <p className="font-medium">{item.title}</p>
+                    <p className="mt-1 text-muted-foreground">{item.rationale}</p>
+                    <p className="mt-2">{item.action}</p>
+                  </div>
+                ))}
+              </div>
+              {aiInterpretationResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {aiInterpretationResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
         </>

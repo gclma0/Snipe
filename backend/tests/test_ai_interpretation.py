@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.ai.context import build_ai_interpretation_context
 from app.ai.llm import (
+    AIClient,
     AIInterpretationResult,
     AIRecommendation,
     ResumeRewriteResult,
@@ -187,6 +188,22 @@ def test_resume_rewrite_context_uses_bounded_existing_bullets() -> None:
     assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
     assert len(context["existing_bullets"]) <= 5
     assert all(len(item) <= 240 for item in context["existing_bullets"])
+
+
+def test_local_resume_rewrite_does_not_return_noop_suggestions() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_resume_rewrite_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_rewrite_suggestions(context)
+
+    assert result.suggestions
+    assert all(item.suggested != item.original for item in result.suggestions)
 
 
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:

@@ -242,22 +242,36 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
     verified_skills = context.get("verified_skills") or []
     skill_gap = context.get("skill_gap") or {}
     matched = set(skill_gap.get("matched") or [])
+    target_job = context.get("target_job") or {}
+    target_keywords = []
+    if isinstance(target_job, dict):
+        target_keywords = [
+            item
+            for item in (
+                target_job.get("required_skills", [])
+                + target_job.get("preferred_skills", [])
+                + target_job.get("ats_keywords", [])
+            )
+            if isinstance(item, str)
+        ]
     suggestions: list[ResumeRewriteSuggestion] = []
     for bullet in bullets[:3]:
-        evidence = sorted(set(verified_skills[:6]) & matched) or verified_skills[:3]
-        if evidence:
-            suggested = f"{bullet.rstrip('.')} using {', '.join(evidence[:3])}."
-        else:
-            suggested = bullet
+        evidence = _rewrite_evidence(
+            verified_skills=verified_skills,
+            matched=matched,
+            target_keywords=target_keywords,
+        )
+        suggested, needs_candidate_value = _rewrite_bullet(bullet, evidence)
         suggestions.append(
             ResumeRewriteSuggestion(
                 original=bullet,
                 suggested=suggested,
                 rationale=(
-                    "This keeps the original claim but makes verified skills easier to scan."
+                    "This keeps the original claim and adds only verified evidence or a "
+                    "candidate-supplied placeholder."
                 ),
                 evidence_used=evidence[:3],
-                needs_candidate_value=False,
+                needs_candidate_value=needs_candidate_value,
             )
         )
     if not suggestions and verified_skills:
@@ -284,4 +298,30 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
                 "verifiable details."
             )
         ],
+    )
+
+
+def _rewrite_evidence(
+    *,
+    verified_skills: list[str],
+    matched: set[str],
+    target_keywords: list[str],
+) -> list[str]:
+    verified = {skill.lower() for skill in verified_skills}
+    normalized_targets = {keyword.lower() for keyword in target_keywords}
+    matched_verified = sorted(verified & {skill.lower() for skill in matched})
+    target_verified = sorted(verified & normalized_targets)
+    return matched_verified[:3] or target_verified[:3] or verified_skills[:3]
+
+
+def _rewrite_bullet(bullet: str, evidence: list[str]) -> tuple[str, bool]:
+    cleaned = bullet.strip().rstrip(".")
+    if evidence:
+        evidence_text = ", ".join(evidence[:3])
+        suggested = f"{cleaned}; emphasized verified strengths in {evidence_text}."
+        if suggested.lower() != bullet.strip().lower():
+            return suggested, False
+    return (
+        f"{cleaned}; add a true outcome or scope detail such as [candidate-supplied result].",
+        True,
     )

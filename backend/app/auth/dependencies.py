@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jwt import InvalidTokenError, PyJWKClient
+from jwt import InvalidTokenError
 
 from app.core.config import Settings
 
@@ -46,15 +47,37 @@ def decode_supabase_token(token: str, settings: Settings) -> dict[str, Any]:
     if not issuer:
         raise InvalidTokenError("Supabase URL is not configured.")
 
-    jwks_client = PyJWKClient(f"{issuer}/.well-known/jwks.json")
-    signing_key = jwks_client.get_signing_key_from_jwt(token)
+    signing_key = _fetch_signing_key(
+        jwks_url=f"{issuer}/.well-known/jwks.json",
+        key_id=header.get("kid"),
+    )
     return jwt.decode(
         token,
-        signing_key.key,
+        signing_key,
         algorithms=["ES256", "RS256"],
         audience="authenticated",
         issuer=issuer,
     )
+
+
+def _fetch_signing_key(jwks_url: str, key_id: str | None) -> Any:
+    if not key_id:
+        raise InvalidTokenError("JWT key id is missing.")
+    try:
+        with httpx.Client(timeout=10, trust_env=False) as client:
+            response = client.get(jwks_url)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise InvalidTokenError("Could not fetch Supabase JWKS.") from exc
+
+    keys = response.json().get("keys")
+    if not isinstance(keys, list):
+        raise InvalidTokenError("Supabase JWKS is malformed.")
+
+    for key in keys:
+        if isinstance(key, dict) and key.get("kid") == key_id:
+            return jwt.PyJWK.from_dict(key).key
+    raise InvalidTokenError("JWT signing key was not found.")
 
 
 def get_current_user(

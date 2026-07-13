@@ -226,11 +226,31 @@ describe("ResumeWorkflow", () => {
         evidence_count: 4,
         normalized_profile_updated: true,
       },
+      {
+        id: "job-id",
+        profile_id: "profile-id",
+        source_type: "pasted_text",
+        input_hash: "job-hash",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Operations Analyst",
+          company: "Acme Logistics",
+          required_skills: ["excel", "sql"],
+          preferred_skills: [],
+          tools: ["excel"],
+          soft_skills: ["communication"],
+          responsibilities: ["Build operations reports"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["excel", "sql", "operations"],
+        },
+      },
       [
         {
           id: "output-id",
           output_type: "ai_interview_prep",
-          job_description_id: null,
+          job_description_id: "job-id",
           prompt_version: "ai-interview-prep-v1",
           provider: "local_template",
           model_name: "local-template-v1",
@@ -238,6 +258,18 @@ describe("ResumeWorkflow", () => {
           result_markdown: "# Snipe Interview Prep",
           status: "completed",
           created_at: "2026-07-13T12:00:00Z",
+        },
+        {
+          id: "general-output-id",
+          output_type: "ai_resume_rewrite_suggestions",
+          job_description_id: null,
+          prompt_version: "ai-resume-rewrite-suggestions-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "General rewrite summary." },
+          result_markdown: "# Snipe Resume Rewrite Suggestions",
+          status: "completed",
+          created_at: "2026-07-13T12:05:00Z",
         },
       ],
     ]);
@@ -248,10 +280,20 @@ describe("ResumeWorkflow", () => {
     const fileInput = await screen.findByLabelText(/Upload resume/i);
     const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
     await user.upload(fileInput, file);
+    await user.type(
+      screen.getByPlaceholderText("Paste a target job description here."),
+      "Operations Analyst at Acme Logistics. Requirements include Excel, SQL, communication, and operations reporting. Responsibilities include building reports and improving workflows.",
+    );
+    await user.click(screen.getByRole("button", { name: /Analyze job description/i }));
     await user.click(await screen.findByRole("button", { name: /Load history/i }));
 
     expect(await screen.findByText("Interview prep summary.")).toBeInTheDocument();
+    expect(screen.getByText("General rewrite summary.")).toBeInTheDocument();
     expect(screen.getByLabelText("Type")).toHaveValue("all");
+    expect(screen.getByText("Active target: Operations Analyst at Acme Logistics")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Type"), "active_target");
+    expect(screen.getByText("Interview prep summary.")).toBeInTheDocument();
+    expect(screen.queryByText("General rewrite summary.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /View details/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Copy markdown/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download \.md/i })).toBeInTheDocument();

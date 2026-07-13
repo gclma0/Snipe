@@ -11,6 +11,7 @@ import { GeneratedOutput } from "@/lib/api";
 
 const outputTypeFilters = [
   { value: "all", label: "All outputs" },
+  { value: "active_target", label: "Active target only" },
   { value: "mvp_basic_report", label: "Basic reports" },
   { value: "ai_readiness_interpretation", label: "AI interpretations" },
   { value: "ai_resume_rewrite_suggestions", label: "Rewrite suggestions" },
@@ -28,6 +29,8 @@ type SavedOutputsPanelProps = {
   outputs: GeneratedOutput[];
   filteredOutputs: GeneratedOutput[];
   selectedOutput: GeneratedOutput | null;
+  activeTargetId: string | null;
+  activeTargetLabel: string | null;
   filter: string;
   isBusy: boolean;
   isHistoryRefreshing: boolean;
@@ -44,6 +47,8 @@ export function SavedOutputsPanel({
   outputs,
   filteredOutputs,
   selectedOutput,
+  activeTargetId,
+  activeTargetLabel,
   filter,
   isBusy,
   isHistoryRefreshing,
@@ -95,6 +100,7 @@ export function SavedOutputsPanel({
               <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                 <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
                 <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
+                <JobField label="Target" values={[targetLabel(item.job_description_id, activeTargetId, activeTargetLabel)]} />
               </dl>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isSavedOutputsLoading} type="button" onClick={() => onOpen(item)}>
@@ -131,6 +137,7 @@ export function SavedOutputsPanel({
             <JobField label="Model" values={selectedOutput.model_name ? [selectedOutput.model_name] : []} />
             <JobField label="Version" values={selectedOutput.prompt_version ? [selectedOutput.prompt_version] : []} />
             <JobField label="Status" values={[selectedOutput.status]} />
+            <JobField label="Target" values={[targetLabel(selectedOutput.job_description_id, activeTargetId, activeTargetLabel)]} />
           </dl>
           <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
             {exportContentForOutput(selectedOutput)}
@@ -139,4 +146,18 @@ export function SavedOutputsPanel({
       ) : null}
     </div>
   );
+}
+
+function targetLabel(
+  outputJobDescriptionId: string | null,
+  activeTargetId: string | null,
+  activeTargetLabel: string | null,
+) {
+  if (!outputJobDescriptionId) {
+    return "General profile";
+  }
+  if (activeTargetId && outputJobDescriptionId === activeTargetId) {
+    return activeTargetLabel ? `Active target: ${activeTargetLabel}` : "Active target";
+  }
+  return "Saved target job";
 }

@@ -129,10 +129,15 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
   const [jobMatchQuery, setJobMatchQuery] = useState("");
   const [jobMatchLimit, setJobMatchLimit] = useState(10);
+  const activeTargetLabel = jobResult
+    ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
+    : null;
   const filteredGeneratedOutputs =
     generatedOutputFilter === "all"
       ? generatedOutputs
-      : generatedOutputs.filter((item) => item.output_type === generatedOutputFilter);
+      : generatedOutputFilter === "active_target"
+        ? generatedOutputs.filter((item) => Boolean(jobResult?.id) && item.job_description_id === jobResult?.id)
+        : generatedOutputs.filter((item) => item.output_type === generatedOutputFilter);
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -1196,11 +1201,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onUploadResume={handleUpload}
           />
           <ResumeUploadSummary
-            activeTargetLabel={
-              jobResult
-                ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
-                : null
-            }
+            activeTargetLabel={activeTargetLabel}
             isBusy={isBusy}
             isSavedOutputsLoading={isSavedOutputsLoading}
             uploadResult={uploadResult}
@@ -1259,6 +1260,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onDownloadFullReport={handleDownloadFullReport}
           />
           <SavedOutputsPanel
+            activeTargetId={jobResult?.id ?? null}
+            activeTargetLabel={activeTargetLabel}
             deletingOutputId={deletingGeneratedOutputId}
             filter={generatedOutputFilter}
             filteredOutputs={filteredGeneratedOutputs}

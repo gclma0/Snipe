@@ -1,6 +1,6 @@
-import { Database, Search } from "lucide-react";
+import { Database, Search, Trash2 } from "lucide-react";
 
-import { RagDocumentResult, RagSearchResult, RagSourceType } from "@/lib/api";
+import { RagDocumentResult, RagDocumentSummary, RagSearchResult, RagSourceType } from "@/lib/api";
 
 const sourceTypeOptions: { value: RagSourceType; label: string }[] = [
   { value: "job_listing", label: "Job listing" },
@@ -11,9 +11,11 @@ const sourceTypeOptions: { value: RagSourceType; label: string }[] = [
 
 type RagReferencePanelProps = {
   documentResult: RagDocumentResult | null;
+  documents: RagDocumentSummary[];
   searchResult: RagSearchResult | null;
   jobSearchResult: RagSearchResult | null;
   isBusy: boolean;
+  deletingDocumentId: string | null;
   title: string;
   sourceType: RagSourceType;
   sourceUrl: string;
@@ -29,15 +31,19 @@ type RagReferencePanelProps = {
   onLimitChange: (value: number) => void;
   onSearchSourceTypesChange: (value: RagSourceType[]) => void;
   onIngest: () => void;
+  onDeleteDocument: (documentId: string) => void;
+  onLoadDocuments: () => void;
   onJobSearch: () => void;
   onSearch: () => void;
 };
 
 export function RagReferencePanel({
   documentResult,
+  documents,
   searchResult,
   jobSearchResult,
   isBusy,
+  deletingDocumentId,
   title,
   sourceType,
   sourceUrl,
@@ -53,6 +59,8 @@ export function RagReferencePanel({
   onLimitChange,
   onSearchSourceTypesChange,
   onIngest,
+  onDeleteDocument,
+  onLoadDocuments,
   onJobSearch,
   onSearch,
 }: RagReferencePanelProps) {
@@ -118,6 +126,51 @@ export function RagReferencePanel({
           Added {documentResult.title} as {documentResult.chunk_count} searchable chunk(s).
         </p>
       ) : null}
+      <div className="mt-5 border-t border-border pt-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h4 className="text-sm font-semibold">Saved references</h4>
+          <button
+            className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium"
+            disabled={isBusy}
+            type="button"
+            onClick={onLoadDocuments}
+          >
+            <Database aria-hidden="true" className="h-4 w-4" />
+            Load references
+          </button>
+        </div>
+        {documents.length ? (
+          <div className="mt-3 grid gap-3">
+            {documents.map((item) => (
+              <div key={item.document_id} className="border border-border p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.source_type}
+                      {item.created_at ? ` - ${new Date(item.created_at).toLocaleDateString()}` : ""}
+                    </p>
+                    {item.source_url ? (
+                      <p className="mt-1 break-all text-xs text-muted-foreground">{item.source_url}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
+                    disabled={isBusy || deletingDocumentId === item.document_id}
+                    type="button"
+                    onClick={() => onDeleteDocument(item.document_id)}
+                  >
+                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    {deletingDocumentId === item.document_id ? "Deleting" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-muted-foreground">No saved references loaded yet.</p>
+        )}
+      </div>
       <div className="mt-5 border-t border-border pt-5">
         <h4 className="text-sm font-semibold">Search references</h4>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_9rem]">

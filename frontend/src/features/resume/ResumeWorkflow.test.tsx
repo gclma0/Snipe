@@ -317,6 +317,18 @@ describe("ResumeWorkflow", () => {
         chunk_count: 2,
         embedding_model: "deterministic-hashing-v1",
       },
+      [
+        {
+          document_id: "doc-1",
+          title: "Data Analyst Job Listing",
+          source_type: "job_listing",
+          source_url: "https://example.com/jobs/data",
+          content_hash: "content-hash",
+          embedding_model: "deterministic-hashing-v1",
+          metadata: {},
+          created_at: "2026-07-13T12:00:00Z",
+        },
+      ],
       {
         query: "python sql analytics",
         embedding_model: "deterministic-hashing-v1",
@@ -351,6 +363,10 @@ describe("ResumeWorkflow", () => {
           },
         ],
       },
+      {
+        document_id: "doc-1",
+        deleted: true,
+      },
     ]);
     render(<ResumeWorkflow accessToken="token" />);
 
@@ -366,6 +382,7 @@ describe("ResumeWorkflow", () => {
     await user.click(screen.getByRole("button", { name: /Add reference/i }));
 
     expect(await screen.findByText(/Added Data Analyst Job Listing as 2 searchable chunk/i)).toBeInTheDocument();
+    expect(screen.getByText("Data Analyst Job Listing")).toBeInTheDocument();
     await user.clear(screen.getByLabelText(/^Query$/i));
     await user.type(screen.getByLabelText(/^Query$/i), "python sql analytics");
     await user.selectOptions(screen.getByLabelText(/Reference results/i), "5");
@@ -377,9 +394,18 @@ describe("ResumeWorkflow", () => {
 
     expect(await screen.findByText("Job reference results")).toBeInTheDocument();
     expect(screen.getByText("Job-only citation with Python, SQL, and analytics requirements.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Delete$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("https://example.com/jobs/data")).not.toBeInTheDocument();
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/rag/documents"),
       expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/documents?limit=20"),
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer token" }) }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/rag/search"),
@@ -400,6 +426,10 @@ describe("ResumeWorkflow", () => {
           query: "python sql analytics",
         }),
       }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/documents/doc-1"),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

@@ -44,7 +44,9 @@ export type {
   GitHubSourceResult,
   PortfolioSourceResult,
   LinkedInSourceResult,
+  RagDocumentDeletionResult,
   RagDocumentResult,
+  RagDocumentSummary,
   RagSearchResult,
   RagSourceType,
 } from "./apiTypes";
@@ -79,7 +81,9 @@ import type {
   GitHubSourceResult,
   PortfolioSourceResult,
   LinkedInSourceResult,
+  RagDocumentDeletionResult,
   RagDocumentResult,
+  RagDocumentSummary,
   RagSearchResult,
   RagSourceType,
 } from "./apiTypes";
@@ -539,6 +543,23 @@ export function createRagDocument(
       source_url: payload.source_url || null,
     }),
   });
+}
+
+export function listRagDocuments(token: string, limit = 20) {
+  return request<RagDocumentSummary[]>(
+    `/rag/documents?limit=${encodeURIComponent(String(limit))}`,
+    token,
+  );
+}
+
+export function deleteRagDocument(token: string, documentId: string) {
+  return request<RagDocumentDeletionResult>(
+    `/rag/documents/${encodeURIComponent(documentId)}`,
+    token,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export function searchRagReferences(

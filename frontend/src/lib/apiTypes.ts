@@ -494,6 +494,22 @@ export type RagDocumentResult = {
   embedding_model: string;
 };
 
+export type RagDocumentSummary = {
+  document_id: string;
+  title: string;
+  source_type: RagSourceType;
+  source_url: string | null;
+  content_hash: string;
+  embedding_model: string;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+};
+
+export type RagDocumentDeletionResult = {
+  document_id: string;
+  deleted: boolean;
+};
+
 export type RagCitation = {
   document_id: string;
   chunk_id: string | null;

@@ -383,6 +383,52 @@ class SupabaseClient:
             raise SupabaseError(f"RAG chunk insert failed: {response.text[:300]}")
         return response.json()
 
+    def list_rag_documents(
+        self,
+        *,
+        user_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/rag_documents",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,title,source_type,source_url,content_hash,"
+                        "embedding_model,metadata,created_at"
+                    ),
+                    "user_id": f"eq.{user_id}",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG document list failed: {response.text[:300]}")
+        return response.json()
+
+    def delete_rag_document(
+        self,
+        *,
+        user_id: str,
+        document_id: str,
+    ) -> bool:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.delete(
+                f"{self.base_url}/rest/v1/rag_documents",
+                headers={
+                    **self.headers,
+                    "Prefer": "return=representation",
+                },
+                params={
+                    "id": f"eq.{document_id}",
+                    "user_id": f"eq.{user_id}",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG document delete failed: {response.text[:300]}")
+        return bool(response.json())
+
     def match_rag_chunks(
         self,
         *,

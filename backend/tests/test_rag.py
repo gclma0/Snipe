@@ -35,6 +35,17 @@ class FakeSupabaseClient:
         self.chunks.extend(rows)
         return rows
 
+    def list_rag_documents(self, *, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        assert user_id == TEST_USER_ID
+        return list(reversed(self.documents))[:limit]
+
+    def delete_rag_document(self, *, user_id: str, document_id: str) -> bool:
+        assert user_id == TEST_USER_ID
+        before_count = len(self.documents)
+        self.documents = [document for document in self.documents if document["id"] != document_id]
+        self.chunks = [chunk for chunk in self.chunks if chunk["document_id"] != document_id]
+        return len(self.documents) != before_count
+
     def match_rag_chunks(
         self,
         *,
@@ -198,6 +209,41 @@ def test_rag_api_ingests_and_searches_documents() -> None:
     body = search_response.json()
     assert body["citations"][0]["title"] == "Analytics Guidance"
     assert body["citations"][0]["source_type"] == "career_guidance"
+
+
+def test_rag_api_lists_and_deletes_documents() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+    client.post(
+        "/api/v1/rag/documents",
+        json={
+            "title": "Analytics Guidance",
+            "source_type": "career_guidance",
+            "source_url": "https://example.com/guidance",
+            "text": "Python SQL analytics dashboards stakeholder reporting " * 30,
+        },
+    )
+
+    list_response = client.get("/api/v1/rag/documents")
+    delete_response = client.delete("/api/v1/rag/documents/doc-1")
+
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["document_id"] == "doc-1"
+    assert list_response.json()[0]["source_url"] == "https://example.com/guidance"
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"document_id": "doc-1", "deleted": True}
+    assert fake.documents == []
+    assert fake.chunks == []
+
+
+def test_rag_api_delete_returns_not_found_for_missing_document() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+
+    response = client.delete("/api/v1/rag/documents/missing-doc")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "RAG document not found."
 
 
 def test_job_reference_search_filters_to_job_sources() -> None:

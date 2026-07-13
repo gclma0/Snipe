@@ -44,6 +44,7 @@ import {
   PortfolioSourceResult,
   PrivacyDataSummaryResult,
   RagDocumentResult,
+  RagDocumentSummary,
   RagSearchResult,
   RagSourceType,
   ProjectRoadmapResult,
@@ -74,11 +75,13 @@ import {
   deleteGeneratedOutput,
   deleteProfileData,
   deleteProfileDocuments,
+  deleteRagDocument,
   getPrivacyDataSummary,
   getGeneratedOutput,
   listGeneratedOutputs,
   listJobDescriptions,
   listProfiles,
+  listRagDocuments,
   runAtsReadinessAnalysis,
   runJobMatches,
   runProfileCompletenessAnalysis,
@@ -126,12 +129,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
+  const [ragDocuments, setRagDocuments] = useState<RagDocumentSummary[]>([]);
   const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
   const [jobRagSearchResult, setJobRagSearchResult] = useState<RagSearchResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [selectedGeneratedOutput, setSelectedGeneratedOutput] = useState<GeneratedOutput | null>(null);
   const [deletingGeneratedOutputId, setDeletingGeneratedOutputId] = useState<string | null>(null);
+  const [deletingRagDocumentId, setDeletingRagDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
@@ -1209,10 +1214,50 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       });
       setRagDocumentResult(result);
       setRagQuery((current) => current || result.title);
+      const documents = await listRagDocuments(accessToken);
+      setRagDocuments(documents);
       setMessage("Reference added to the library.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not add reference.");
     } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleLoadRagDocuments() {
+    if (!accessToken) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const documents = await listRagDocuments(accessToken);
+      setRagDocuments(documents);
+      setMessage(documents.length ? "References loaded." : "No saved references found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load references.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDeleteRagDocument(documentId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setDeletingRagDocumentId(documentId);
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await deleteRagDocument(accessToken, documentId);
+      setRagDocuments((current) => current.filter((item) => item.document_id !== result.document_id));
+      setMessage("Reference deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete reference.");
+    } finally {
+      setDeletingRagDocumentId(null);
       setIsBusy(false);
     }
   }
@@ -1343,7 +1388,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
           />
           {profile ? (
             <RagReferencePanel
+              deletingDocumentId={deletingRagDocumentId}
               documentResult={ragDocumentResult}
+              documents={ragDocuments}
               isBusy={isBusy}
               jobSearchResult={jobRagSearchResult}
               limit={ragLimit}
@@ -1354,9 +1401,11 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               sourceUrl={ragSourceUrl}
               text={ragText}
               title={ragTitle}
+              onDeleteDocument={handleDeleteRagDocument}
               onIngest={handleIngestRagReference}
               onJobSearch={handleSearchJobRagReferences}
               onLimitChange={setRagLimit}
+              onLoadDocuments={handleLoadRagDocuments}
               onQueryChange={setRagQuery}
               onSearch={handleSearchRagReferences}
               onSearchSourceTypesChange={setRagSearchSourceTypes}

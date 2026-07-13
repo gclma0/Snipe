@@ -91,6 +91,15 @@ type ResumeWorkflowProps = {
   accessToken: string | null;
 };
 
+const outputTypeFilters = [
+  { value: "all", label: "All outputs" },
+  { value: "mvp_basic_report", label: "Basic reports" },
+  { value: "ai_readiness_interpretation", label: "AI interpretations" },
+  { value: "ai_resume_rewrite_suggestions", label: "Rewrite suggestions" },
+  { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
+  { value: "ai_interview_prep", label: "Interview prep" },
+] as const;
+
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
@@ -109,8 +118,13 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
+  const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const filteredGeneratedOutputs =
+    generatedOutputFilter === "all"
+      ? generatedOutputs
+      : generatedOutputs.filter((item) => item.output_type === generatedOutputFilter);
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -170,6 +184,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setGeneratedOutputs([]);
+      setGeneratedOutputFilter("all");
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -196,6 +211,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setGeneratedOutputs([]);
+      setGeneratedOutputFilter("all");
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -303,6 +319,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setGeneratedOutputs([]);
+      setGeneratedOutputFilter("all");
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -338,6 +355,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setGeneratedOutputs([]);
+      setGeneratedOutputFilter("all");
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -356,6 +374,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await createBasicReport(accessToken, profile.id, jobResult?.id ?? null);
       setReportResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
       setMessage("Basic report generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate report.");
@@ -379,6 +398,15 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not load saved outputs.");
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  async function refreshGeneratedOutputs(token: string, profileId: string) {
+    try {
+      const result = await listGeneratedOutputs(token, profileId);
+      setGeneratedOutputs(result);
+    } catch {
+      // Refreshing history should not hide a successful generation result.
     }
   }
 
@@ -421,6 +449,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         forceRegenerate,
       );
       setAiInterpretationResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
       setMessage(result.cached ? "AI interpretation loaded from cache." : "AI interpretation generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate AI interpretation.");
@@ -444,6 +473,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         forceRegenerate,
       );
       setRewriteResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
       setMessage(result.cached ? "Rewrite suggestions loaded from cache." : "Rewrite suggestions generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate rewrite suggestions.");
@@ -467,6 +497,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         forceRegenerate,
       );
       setTailoringResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
       setMessage(result.cached ? "Tailoring package loaded from cache." : "Tailoring package generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate tailoring package.");
@@ -490,6 +521,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         forceRegenerate,
       );
       setInterviewResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
       setMessage(result.cached ? "Interview prep loaded from cache." : "Interview prep generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
@@ -881,12 +913,31 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
           ) : null}
           {generatedOutputs.length ? (
             <div className="mt-5 border-t border-border pt-5 text-sm">
-              <div className="flex items-baseline gap-3">
-                <h3 className="text-base font-semibold">Saved outputs</h3>
-                <p className="text-xs text-muted-foreground">{generatedOutputs.length}</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-baseline gap-3">
+                  <h3 className="text-base font-semibold">Saved outputs</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {filteredGeneratedOutputs.length} of {generatedOutputs.length}
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  Type
+                  <select
+                    className="border border-border bg-white px-3 py-2 text-sm"
+                    value={generatedOutputFilter}
+                    onChange={(event) => setGeneratedOutputFilter(event.target.value)}
+                  >
+                    {outputTypeFilters.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-              <div className="mt-4 grid gap-3">
-                {generatedOutputs.map((item) => (
+              {filteredGeneratedOutputs.length ? (
+                <div className="mt-4 grid gap-3">
+                  {filteredGeneratedOutputs.map((item) => (
                   <div key={item.id} className="border border-border p-3">
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                       <p className="font-medium">{formatOutputType(item.output_type)}</p>
@@ -915,8 +966,11 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                       </pre>
                     ) : null}
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-muted-foreground">No saved outputs match this filter.</p>
+              )}
             </div>
           ) : null}
           {aiInterpretationResult ? (

@@ -121,6 +121,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
+  const [isSavedOutputsLoading, setIsSavedOutputsLoading] = useState(false);
+  const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
   const filteredGeneratedOutputs =
     generatedOutputFilter === "all"
       ? generatedOutputs
@@ -370,6 +373,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
 
     setIsBusy(true);
+    setBusyLabel("Generating basic report...");
     setMessage(null);
     try {
       const result = await createBasicReport(accessToken, profile.id, jobResult?.id ?? null);
@@ -380,6 +384,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not generate report.");
     } finally {
       setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -388,7 +393,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       return;
     }
 
-    setIsBusy(true);
+    setIsSavedOutputsLoading(true);
     setMessage(null);
     try {
       const result = await listGeneratedOutputs(accessToken, profile.id);
@@ -397,16 +402,19 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load saved outputs.");
     } finally {
-      setIsBusy(false);
+      setIsSavedOutputsLoading(false);
     }
   }
 
   async function refreshGeneratedOutputs(token: string, profileId: string) {
+    setIsHistoryRefreshing(true);
     try {
       const result = await listGeneratedOutputs(token, profileId);
       setGeneratedOutputs(result);
     } catch {
       // Refreshing history should not hide a successful generation result.
+    } finally {
+      setIsHistoryRefreshing(false);
     }
   }
 
@@ -440,6 +448,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
 
     setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating AI interpretation..." : "Generating AI interpretation...");
     setMessage(null);
     try {
       const result = await createAIReadinessInterpretation(
@@ -455,6 +464,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not generate AI interpretation.");
     } finally {
       setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -464,6 +474,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
 
     setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating rewrite suggestions..." : "Generating rewrite suggestions...");
     setMessage(null);
     try {
       const result = await createResumeRewriteSuggestions(
@@ -479,6 +490,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not generate rewrite suggestions.");
     } finally {
       setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -488,6 +500,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
 
     setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating tailoring package..." : "Generating tailoring package...");
     setMessage(null);
     try {
       const result = await createResumeTailoringPackage(
@@ -503,6 +516,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not generate tailoring package.");
     } finally {
       setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -512,6 +526,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
 
     setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating interview prep..." : "Generating interview prep...");
     setMessage(null);
     try {
       const result = await createInterviewPrep(
@@ -527,6 +542,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
     } finally {
       setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -753,58 +769,75 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <dt className="font-medium">Profile version</dt>
                 <dd className="text-muted-foreground">{uploadResult.profile_version ?? "Pending"}</dd>
               </div>
-              <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunAnalysis}>
-                <Gauge aria-hidden="true" className="h-4 w-4" />
-                Run resume quality analysis
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunReadinessScores}>
-                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
-                Run readiness scores
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleRunDashboard}>
-                <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
-                Run readiness dashboard
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateReport}>
-                <ScrollText aria-hidden="true" className="h-4 w-4" />
-                Generate basic report
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleLoadGeneratedOutputs}>
-                <History aria-hidden="true" className="h-4 w-4" />
-                Load saved outputs
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(false)}>
-                <Sparkles aria-hidden="true" className="h-4 w-4" />
-                Generate AI interpretation
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(true)}>
-                <Sparkles aria-hidden="true" className="h-4 w-4" />
-                Regenerate AI interpretation
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(false)}>
-                <ScrollText aria-hidden="true" className="h-4 w-4" />
-                Generate rewrite suggestions
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(true)}>
-                <ScrollText aria-hidden="true" className="h-4 w-4" />
-                Regenerate rewrite suggestions
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(false)}>
-                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
-                Generate tailoring package
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(true)}>
-                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
-                Regenerate tailoring package
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(false)}>
-                <MessageSquare aria-hidden="true" className="h-4 w-4" />
-                Generate interview prep
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(true)}>
-                <MessageSquare aria-hidden="true" className="h-4 w-4" />
-                Regenerate interview prep
-              </button>
+              <div className="grid gap-4 pt-2 sm:col-span-2">
+                <div>
+                  <h3 className="text-sm font-semibold">Analysis</h3>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="button" onClick={handleRunAnalysis}>
+                      <Gauge aria-hidden="true" className="h-4 w-4" />
+                      Resume quality
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleRunReadinessScores}>
+                      <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                      Readiness scores
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleRunDashboard}>
+                      <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
+                      Readiness dashboard
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateReport}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Basic report
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">Saved outputs</h3>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isSavedOutputsLoading} type="button" onClick={handleLoadGeneratedOutputs}>
+                      <History aria-hidden="true" className="h-4 w-4" />
+                      {isSavedOutputsLoading ? "Loading..." : "Load history"}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">AI generation</h3>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(false)}>
+                      <Sparkles aria-hidden="true" className="h-4 w-4" />
+                      AI interpretation
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(true)}>
+                      <Sparkles aria-hidden="true" className="h-4 w-4" />
+                      Regenerate interpretation
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(false)}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Rewrite suggestions
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(true)}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Regenerate rewrites
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(false)}>
+                      <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                      Tailoring package
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(true)}>
+                      <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                      Regenerate tailoring
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(false)}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Interview prep
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(true)}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Regenerate prep
+                    </button>
+                  </div>
+                </div>
+              </div>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -917,7 +950,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <div className="flex items-baseline gap-3">
                   <h3 className="text-base font-semibold">Saved outputs</h3>
                   <p className="text-xs text-muted-foreground">
-                    {filteredGeneratedOutputs.length} of {generatedOutputs.length}
+                    {isHistoryRefreshing
+                      ? "Refreshing..."
+                      : `${filteredGeneratedOutputs.length} of ${generatedOutputs.length}`}
                   </p>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium">
@@ -1127,6 +1162,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
           ) : null}
         </>
       )}
+      {busyLabel ? <p className="mt-4 text-sm text-muted-foreground">{busyLabel}</p> : null}
+      {isSavedOutputsLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading saved outputs...</p> : null}
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
   );

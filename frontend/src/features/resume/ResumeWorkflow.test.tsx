@@ -25,6 +25,41 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByLabelText(/Career goal/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Preferred role/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Create profile/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Load latest profile/i })).toBeInTheDocument();
+  });
+
+  it("loads the latest profile and saved outputs after refresh", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      [
+        {
+          id: "profile-id",
+          career_goal: "Prepare for a target role",
+          preferred_role: "Operations Analyst",
+          profile_status: "draft",
+        },
+      ],
+      [
+        {
+          id: "output-id",
+          output_type: "ai_interview_prep",
+          job_description_id: null,
+          prompt_version: "ai-interview-prep-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "Saved interview prep summary." },
+          result_markdown: "# Snipe Interview Prep",
+          status: "completed",
+          created_at: "2026-07-13T12:00:00Z",
+        },
+      ],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.click(screen.getByRole("button", { name: /Load latest profile/i }));
+
+    expect(await screen.findByText(/Profile ready for Operations Analyst/i)).toBeInTheDocument();
+    expect(screen.getByText("Saved interview prep summary.")).toBeInTheDocument();
   });
 
   it("groups post-upload actions by workflow area", async () => {

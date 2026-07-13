@@ -73,6 +73,7 @@ import {
   getPrivacyDataSummary,
   getGeneratedOutput,
   listGeneratedOutputs,
+  listProfiles,
   runAtsReadinessAnalysis,
   runJobMatches,
   runProfileCompletenessAnalysis,
@@ -246,6 +247,60 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleLoadLatestProfile() {
+    if (!accessToken) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const profiles = await listProfiles(accessToken);
+      const latestProfile = profiles[0] ?? null;
+      if (!latestProfile) {
+        setMessage("No saved profiles found yet.");
+        return;
+      }
+
+      const outputs = await listGeneratedOutputs(accessToken, latestProfile.id);
+      setProfile(latestProfile);
+      setUploadResult(null);
+      setQualityResult(null);
+      setAtsResult(null);
+      setCompletenessResult(null);
+      setJobResult(null);
+      setGithubResult(null);
+      setPortfolioResult(null);
+      setLinkedInResult(null);
+      setSkillGapResult(null);
+      setJobMatchResult(null);
+      setDashboardResult(null);
+      setReportResult(null);
+      setFullReportResult(null);
+      setPrivacySummary(null);
+      setAiInterpretationResult(null);
+      setRewriteResult(null);
+      setTailoringResult(null);
+      setInterviewResult(null);
+      setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
+      setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
+      setGeneratedOutputs(outputs);
+      setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
+      setMessage(outputs.length ? "Latest profile and saved outputs loaded." : "Latest profile loaded. No saved outputs found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load latest profile.");
     } finally {
       setIsBusy(false);
     }
@@ -1045,6 +1100,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               Create profile
             </button>
           </form>
+          <button className="mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleLoadLatestProfile}>
+            <History aria-hidden="true" className="h-4 w-4" />
+            Load latest profile
+          </button>
           {form.formState.errors.career_goal ? <p className="mt-2 text-sm text-red-600">{form.formState.errors.career_goal.message}</p> : null}
           {form.formState.errors.preferred_role ? <p className="mt-2 text-sm text-red-600">{form.formState.errors.preferred_role.message}</p> : null}
           {profile ? (

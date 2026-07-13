@@ -69,6 +69,8 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Job matches/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Load history/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate prep/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Claim questions/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Regenerate claims/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Project roadmap$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate roadmap/i })).toBeInTheDocument();
   });
@@ -352,6 +354,69 @@ describe("ResumeWorkflow", () => {
     expect(screen.getAllByText("Data Analyst").length).toBeGreaterThan(0);
     expect(screen.getByText("Apply with tailoring")).toBeInTheDocument();
     expect(screen.getByText(/Analytics job listing/)).toBeInTheDocument();
+  });
+
+  it("renders generated claim verification questions", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Data Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        output_type: "ai_claim_verification_questions",
+        output_version: "ai-claim-verification-v1",
+        provider: "deterministic",
+        model_name: "deterministic-claim-verification-v1",
+        summary: "Claim questions generated with evidence-strength notes.",
+        questions: [
+          {
+            claim: "python",
+            evidence_strength: "strong",
+            question: "What specific example proves your experience with python?",
+            why_it_matters: "Interviewers often ask for scope and outcomes.",
+            evidence_to_prepare: ["A real task involving python."],
+            caution: null,
+          },
+        ],
+        evidence_strength_notes: ["Strong evidence means the profile includes a specific excerpt."],
+        cautions: ["Do not add unsupported metrics."],
+        cached: false,
+      },
+      [],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Data Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /^Claim questions$/i }));
+
+    expect(await screen.findByRole("heading", { name: "Claim questions" })).toBeInTheDocument();
+    expect(screen.getByText("strong")).toBeInTheDocument();
+    expect(screen.getByText(/What specific example proves/)).toBeInTheDocument();
+    expect(screen.queryByText(/lie detector/i)).not.toBeInTheDocument();
   });
 });
 

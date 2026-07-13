@@ -28,6 +28,7 @@ import {
   AIInterpretationResult,
   ApplicationMaterialsResult,
   CandidateProfile,
+  ClaimVerificationResult,
   DeterministicScoreResult,
   GeneratedOutput,
   GitHubSourceResult,
@@ -49,6 +50,7 @@ import {
   createAIReadinessInterpretation,
   createApplicationMaterials,
   createBasicReport,
+  createClaimVerificationQuestions,
   createInterviewPrep,
   createJobDescription,
   createProjectRoadmap,
@@ -107,6 +109,7 @@ const outputTypeFilters = [
   { value: "ai_resume_rewrite_suggestions", label: "Rewrite suggestions" },
   { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
   { value: "ai_interview_prep", label: "Interview prep" },
+  { value: "ai_claim_verification_questions", label: "Claim questions" },
   { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
   { value: "ai_application_materials", label: "Application materials" },
 ] as const;
@@ -129,6 +132,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
+  const [claimVerificationResult, setClaimVerificationResult] = useState<ClaimVerificationResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
@@ -203,6 +207,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setClaimVerificationResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -234,6 +239,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setClaimVerificationResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -346,6 +352,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setClaimVerificationResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -386,6 +393,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setClaimVerificationResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -619,6 +627,32 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Interview prep loaded from cache." : "Interview prep generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateClaimVerification(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating claim questions..." : "Generating claim questions...");
+    setMessage(null);
+    try {
+      const result = await createClaimVerificationQuestions(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setClaimVerificationResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(result.cached ? "Claim questions loaded from cache." : "Claim questions generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate claim questions.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -991,6 +1025,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(true)}>
                       <MessageSquare aria-hidden="true" className="h-4 w-4" />
                       Regenerate prep
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateClaimVerification(false)}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Claim questions
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateClaimVerification(true)}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Regenerate claims
                     </button>
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(false)}>
                       <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
@@ -1388,6 +1430,50 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               ) : null}
             </div>
           ) : null}
+          {claimVerificationResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Claim questions</h3>
+                <p className="text-xs text-muted-foreground">
+                  {claimVerificationResult.cached ? "Cached" : claimVerificationResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{claimVerificationResult.summary}</p>
+              {claimVerificationResult.questions.length ? (
+                <div className="mt-4 grid gap-3">
+                  {claimVerificationResult.questions.map((item) => (
+                    <div key={`${item.claim}-${item.question}`} className="border border-border p-3">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                        <p className="font-medium">{item.claim}</p>
+                        <p className="text-xs uppercase text-muted-foreground">
+                          {item.evidence_strength.replace("_", " ")}
+                        </p>
+                      </div>
+                      <p className="mt-2">{item.question}</p>
+                      <p className="mt-2 text-muted-foreground">{item.why_it_matters}</p>
+                      <JobField label="Evidence to prepare" values={item.evidence_to_prepare} />
+                      {item.caution ? (
+                        <p className="mt-2 text-muted-foreground">{item.caution}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <dl className="mt-4 grid gap-3">
+                <JobField
+                  label="Evidence strength notes"
+                  values={claimVerificationResult.evidence_strength_notes}
+                />
+              </dl>
+              {claimVerificationResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {claimVerificationResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
           {projectRoadmapResult ? (
             <div className="mt-5 border-t border-border pt-5 text-sm">
               <div className="flex items-baseline gap-3">
@@ -1510,6 +1596,7 @@ function JobField({ label, values }: { label: string; values: string[] }) {
 function formatOutputType(outputType: string) {
   const labels: Record<string, string> = {
     ai_interview_prep: "Interview prep",
+    ai_claim_verification_questions: "Claim questions",
     ai_readiness_interpretation: "AI interpretation",
     ai_resume_rewrite_suggestions: "Rewrite suggestions",
     ai_resume_tailoring_package: "Tailoring package",

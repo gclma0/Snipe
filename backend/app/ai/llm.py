@@ -70,7 +70,12 @@ class ResumeTailoringPackageResult(BaseModel):
 
 
 class InterviewQuestion(BaseModel):
-    category: str = Field(pattern="^(role_specific|technical|behavioral|screening)$")
+    category: str = Field(
+        pattern=(
+            "^(role_specific|technical|behavioral|situational|resume_based|project_based|"
+            "portfolio_based|leadership|career_transition|job_specific|screening)$"
+        )
+    )
     question: str
     why_it_matters: str
     answer_guidance: str
@@ -84,7 +89,7 @@ class InterviewPrepResult(BaseModel):
     provider: str
     model_name: str
     summary: str
-    questions: list[InterviewQuestion] = Field(default_factory=list, max_length=10)
+    questions: list[InterviewQuestion] = Field(default_factory=list, max_length=12)
     star_guidance: list[str] = Field(default_factory=list, max_length=6)
     missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
     cautions: list[str] = Field(default_factory=list, max_length=5)
@@ -776,11 +781,25 @@ def _local_template_interview_prep(context: dict[str, Any]) -> InterviewPrepResu
                 evidence_to_use=[skill],
             )
         )
+    questions.append(
+        InterviewQuestion(
+            category="situational",
+            question=f"What would you do in your first 30 days if hired for {role_name}?",
+            why_it_matters=(
+                "Situational questions test judgment, prioritization, and role understanding."
+            ),
+            answer_guidance=(
+                "Use the job requirements and verified strengths. Separate what you know from "
+                "what you would learn during onboarding."
+            ),
+            evidence_to_use=priority_skills[:2],
+        )
+    )
     if experience_signals:
         signal = experience_signals[0]
         questions.append(
             InterviewQuestion(
-                category="behavioral",
+                category="resume_based",
                 question=(
                     "Describe a challenge from one of your listed experiences and how you "
                     "handled it."
@@ -797,6 +816,74 @@ def _local_template_interview_prep(context: dict[str, Any]) -> InterviewPrepResu
                 evidence_to_use=[signal],
             )
         )
+        questions.append(
+            InterviewQuestion(
+                category="behavioral",
+                question="Tell me about a time you worked with others to solve a problem.",
+                why_it_matters="Behavioral questions test collaboration and communication.",
+                answer_guidance=(
+                    "Use a real example from your profile and state your personal contribution."
+                ),
+                evidence_to_use=experience_signals[:2],
+            )
+        )
+    if any("project" in signal.lower() for signal in experience_signals):
+        questions.append(
+            InterviewQuestion(
+                category="project_based",
+                question=(
+                    "Which project best supports this role, and what did you personally "
+                    "deliver?"
+                ),
+                why_it_matters="Project questions test ownership, scope, and practical proof.",
+                answer_guidance=(
+                    "Name only completed or truthful project work and avoid inflated "
+                    "ownership."
+                ),
+                evidence_to_use=experience_signals[:2],
+            )
+        )
+    questions.append(
+        InterviewQuestion(
+            category="leadership",
+            question=(
+                "Where have you shown ownership, coordination, or leadership appropriate "
+                "to your level?"
+            ),
+            why_it_matters=(
+                "Leadership questions check influence and accountability, not just job "
+                "titles."
+            ),
+            answer_guidance=(
+                "Use a real example; do not claim people management unless it actually "
+                "happened."
+            ),
+            evidence_to_use=experience_signals[:2],
+        )
+    )
+    questions.append(
+        InterviewQuestion(
+            category="career_transition",
+            question="How does your previous experience transfer into this target role?",
+            why_it_matters=(
+                "Career-transition questions test whether the move is realistic and "
+                "evidence-backed."
+            ),
+            answer_guidance=(
+                "Connect verified transferable skills to the role and name gaps honestly."
+            ),
+            evidence_to_use=(priority_skills[:2] or experience_signals[:2]),
+        )
+    )
+    questions.append(
+        InterviewQuestion(
+            category="job_specific",
+            question=f"Which listed requirement for {role_name} is your strongest match, and why?",
+            why_it_matters="Job-specific questions test direct alignment with the selected role.",
+            answer_guidance="Choose a verified requirement and support it with a real example.",
+            evidence_to_use=priority_skills[:3],
+        )
+    )
     for skill in missing[:3]:
         questions.append(
             InterviewQuestion(
@@ -850,7 +937,7 @@ def _local_template_interview_prep(context: dict[str, Any]) -> InterviewPrepResu
             if verified_skills
             else "Interview prep is limited because no verified skills were found."
         ),
-        questions=questions[:10],
+        questions=questions[:12],
         star_guidance=[
             "Situation: choose a real work, project, education, or portfolio context.",
             "Task: state your actual responsibility without expanding your role.",

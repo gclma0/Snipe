@@ -186,7 +186,18 @@ export type ResumeTailoringPackageResult = {
 };
 
 export type InterviewQuestion = {
-  category: "role_specific" | "technical" | "behavioral" | "screening";
+  category:
+    | "role_specific"
+    | "technical"
+    | "behavioral"
+    | "situational"
+    | "resume_based"
+    | "project_based"
+    | "portfolio_based"
+    | "leadership"
+    | "career_transition"
+    | "job_specific"
+    | "screening";
   question: string;
   why_it_matters: string;
   answer_guidance: string;
@@ -203,6 +214,27 @@ export type InterviewPrepResult = {
   questions: InterviewQuestion[];
   star_guidance: string[];
   missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
+export type ClaimQuestion = {
+  claim: string;
+  evidence_strength: "strong" | "moderate" | "needs_clarification" | "missing";
+  question: string;
+  why_it_matters: string;
+  evidence_to_prepare: string[];
+  caution: string | null;
+};
+
+export type ClaimVerificationResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  questions: ClaimQuestion[];
+  evidence_strength_notes: string[];
   cautions: string[];
   cached: boolean;
 };
@@ -527,6 +559,24 @@ export function createInterviewPrep(
   forceRegenerate = false,
 ) {
   return request<InterviewPrepResult>(`/profiles/${profileId}/ai/interview-prep`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      force_regenerate: forceRegenerate,
+    }),
+  });
+}
+
+export function createClaimVerificationQuestions(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<ClaimVerificationResult>(`/profiles/${profileId}/ai/claim-verification-questions`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

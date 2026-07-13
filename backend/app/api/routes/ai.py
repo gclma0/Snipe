@@ -5,6 +5,12 @@ from app.ai.application_materials import (
     application_materials_context_hash,
     build_application_materials_context,
 )
+from app.ai.claim_verification import (
+    ClaimVerificationResult,
+    build_claim_verification_context,
+    claim_verification_context_hash,
+    generate_claim_verification_questions,
+)
 from app.ai.context import ai_context_hash, build_ai_interpretation_context
 from app.ai.interview import build_interview_prep_context, interview_context_hash
 from app.ai.llm import (
@@ -41,6 +47,8 @@ PROJECT_ROADMAP_OUTPUT_TYPE = "ai_project_roadmap_recommendations"
 PROJECT_ROADMAP_PROMPT_VERSION = "ai-project-roadmap-v1"
 APPLICATION_MATERIALS_OUTPUT_TYPE = "ai_application_materials"
 APPLICATION_MATERIALS_PROMPT_VERSION = "ai-application-materials-v1"
+CLAIM_VERIFICATION_OUTPUT_TYPE = "ai_claim_verification_questions"
+CLAIM_VERIFICATION_PROMPT_VERSION = "ai-claim-verification-v1"
 
 
 class AIInterpretationRequest(BaseModel):
@@ -369,6 +377,82 @@ def create_interview_prep(
 
 
 @router.post(
+    "/claim-verification-questions",
+    response_model=ClaimVerificationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_claim_verification_questions(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> ClaimVerificationResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating claim questions.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        context = build_claim_verification_context(
+            normalized_profile=normalized_profile,
+            structured_job=structured_job,
+        )
+        force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = claim_verification_context_hash(context)
+        if not force_regenerate:
+            cached = supabase.get_generated_output(
+                user_id=user.id,
+                profile_id=profile_id,
+                output_type=CLAIM_VERIFICATION_OUTPUT_TYPE,
+                input_hash=input_hash,
+                job_description_id=job_description_id,
+            )
+            if cached is not None:
+                result = ClaimVerificationResult(**(cached.get("result_json") or {}))
+                result.cached = True
+                return result
+
+        result = generate_claim_verification_questions(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": CLAIM_VERIFICATION_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": CLAIM_VERIFICATION_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _claim_verification_markdown(result),
+                "status": "completed",
+            }
+        )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
+@router.post(
     "/project-roadmap-recommendations",
     response_model=ProjectRoadmapResult,
     status_code=status.HTTP_201_CREATED,
@@ -627,6 +711,30 @@ def _interview_markdown(result: InterviewPrepResult) -> str:
     if result.missing_evidence_warnings:
         lines.append("## Missing Evidence Warnings")
         lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def _claim_verification_markdown(result: ClaimVerificationResult) -> str:
+    lines = ["# Snipe Claim Questions", "", result.summary, ""]
+    if result.questions:
+        lines.append("## Questions")
+        for item in result.questions:
+            lines.extend(
+                [
+                    f"### {item.claim}",
+                    f"Evidence strength: {item.evidence_strength.replace('_', ' ')}",
+                    item.question,
+                    f"Why: {item.why_it_matters}",
+                    "",
+                ]
+            )
+    if result.evidence_strength_notes:
+        lines.append("## Evidence Strength Notes")
+        lines.extend(f"- {note}" for note in result.evidence_strength_notes)
         lines.append("")
     if result.cautions:
         lines.append("## Cautions")

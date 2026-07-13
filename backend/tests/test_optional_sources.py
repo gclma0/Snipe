@@ -137,9 +137,9 @@ def test_add_linkedin_text_source_records_optional_source(monkeypatch) -> None:
     linkedin_text = """
     Senior Marketing Operations Manager
     About
-    I lead marketing operations, analytics, sales alignment, and strategy.
+    I lead marketing operations, campaign management, analytics, sales alignment, and strategy.
     Experience
-    Built campaign reporting process for regional sales teams.
+    Built campaign reporting process for regional sales teams using HubSpot.
     Skills
     Marketing
     Analytics
@@ -155,6 +155,8 @@ def test_add_linkedin_text_source_records_optional_source(monkeypatch) -> None:
     body = response.json()
     assert body["source_type"] == "linkedin_pasted_text"
     assert "marketing" in body["skill_signals"]
+    assert "campaign management" in body["skill_signals"]
+    assert "hubspot" in body["skill_signals"]
     assert body["experience_count"] > 0
     assert fake.sources[0]["source_type"] == "linkedin_pasted_text"
     assert fake.updates[0]["normalized_json"]["optional_sources"]["linkedin"]["headline"]

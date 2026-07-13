@@ -2,6 +2,8 @@ import re
 
 from pydantic import BaseModel, Field
 
+from app.skills.taxonomy import extract_known_skills
+
 PARSER_VERSION = "linkedin-text-parser-v1"
 
 
@@ -39,7 +41,7 @@ def parse_linkedin_text(
         text_length=len(cleaned),
         headline=headline,
         about=about,
-        skills=_extract_skills(skills_text or cleaned),
+        skills=_extract_skills(f"{skills_text or ''}\n{cleaned}"),
         experience_items=_extract_experience_items(experience_text or cleaned),
     )
 
@@ -78,30 +80,7 @@ def _section_after_heading(lines: list[str], headings: set[str]) -> str | None:
 
 
 def _extract_skills(text: str) -> list[str]:
-    terms = {
-        "accounting",
-        "analytics",
-        "communication",
-        "customer success",
-        "data analysis",
-        "excel",
-        "leadership",
-        "marketing",
-        "operations",
-        "project management",
-        "python",
-        "react",
-        "sales",
-        "sql",
-        "strategy",
-        "typescript",
-    }
-    lowered = text.lower()
-    return sorted(
-        term
-        for term in terms
-        if re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", lowered)
-    )
+    return extract_known_skills(text)
 
 
 def _extract_experience_items(text: str) -> list[str]:

@@ -4,33 +4,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.skills.taxonomy import SKILL_ALIASES, TRANSFERABLE_SKILLS
+
 ANALYSIS_TYPE = "skill_gap"
 DETERMINISTIC_VERSION = "skill-gap-matcher-v1"
-
-SKILL_ALIASES = {
-    "js": "javascript",
-    "javascript": "javascript",
-    "ts": "typescript",
-    "typescript": "typescript",
-    "postgres": "sql",
-    "postgresql": "sql",
-    "sql": "sql",
-    "ms excel": "excel",
-    "microsoft excel": "excel",
-    "excel": "excel",
-    "stakeholders": "stakeholder management",
-    "stakeholder management": "stakeholder management",
-    "project management": "project management",
-    "program management": "project management",
-}
-
-TRANSFERABLE_SKILLS = {
-    "communication",
-    "leadership",
-    "operations",
-    "project management",
-    "stakeholder management",
-}
 
 
 class SkillGapItem(BaseModel):

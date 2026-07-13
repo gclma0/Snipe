@@ -5,33 +5,9 @@ from app.parsing.schemas import ResumeParseResult
 from app.profile.contact_extractor import extract_contact
 from app.profile.schemas import EvidenceCandidate, NormalizedProfileBuild
 from app.profile.section_detector import detect_sections
+from app.skills.taxonomy import extract_known_skills, skill_excerpt
 
 PROFILE_BUILDER_VERSION = "deterministic-profile-builder-v1"
-
-SKILL_TERMS = {
-    "accounting",
-    "analytics",
-    "budgeting",
-    "communication",
-    "content strategy",
-    "customer service",
-    "data analysis",
-    "excel",
-    "fastapi",
-    "financial modeling",
-    "javascript",
-    "leadership",
-    "marketing",
-    "negotiation",
-    "operations",
-    "project management",
-    "python",
-    "react",
-    "sales",
-    "sql",
-    "stakeholder management",
-    "typescript",
-}
 
 SECTION_FACT_TYPES = {
     "summary": "profile_summary",
@@ -112,20 +88,11 @@ def build_normalized_profile(
 
 
 def _extract_skills(text: str, skills_section: str) -> list[str]:
-    haystack = f"{skills_section}\n{text}".lower()
-    found = {
-        skill
-        for skill in SKILL_TERMS
-        if re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", haystack)
-    }
-    return sorted(found)
+    return extract_known_skills(f"{skills_section}\n{text}")
 
 
 def _skill_excerpt(skill: str, text: str) -> str:
-    for line in text.splitlines():
-        if re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", line, re.IGNORECASE):
-            return _excerpt(line)
-    return skill
+    return skill_excerpt(skill, text)
 
 
 def _excerpt(value: str, limit: int = 500) -> str:

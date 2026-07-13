@@ -5,39 +5,20 @@ from pydantic import BaseModel, Field
 
 from app.integrations.portfolio import PortfolioPage
 from app.profile.schemas import EvidenceCandidate
+from app.skills.taxonomy import BUSINESS_SKILLS, MARKETING_SKILLS, TECHNICAL_SKILLS, TOOL_SKILLS
 
 ANALYSIS_VERSION = "portfolio-analysis-v1"
 
-TECHNICAL_TERMS = {
-    "api",
-    "automation",
-    "backend",
-    "cloud",
-    "data",
-    "design system",
-    "frontend",
-    "javascript",
-    "python",
-    "react",
-    "sql",
-    "testing",
-    "typescript",
-    "ux",
-}
+TECHNICAL_TERMS = TECHNICAL_SKILLS | TOOL_SKILLS
 
-NON_TECHNICAL_TERMS = {
+NON_TECHNICAL_TERMS = BUSINESS_SKILLS | MARKETING_SKILLS | {
     "brand",
     "campaign",
     "case study",
     "client",
     "content",
-    "copywriting",
     "customer",
-    "marketing",
-    "operations",
     "portfolio",
-    "sales",
-    "strategy",
 }
 
 PROJECT_TERMS = {"case study", "project", "work", "portfolio", "selected work", "results"}

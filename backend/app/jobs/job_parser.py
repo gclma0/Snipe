@@ -1,59 +1,9 @@
 import re
 
 from app.jobs.schemas import StructuredJobDescription
+from app.skills.taxonomy import SKILL_TERMS, SOFT_SKILLS, TOOL_SKILLS
 
 PARSER_VERSION = "deterministic-job-parser-v1"
-
-SKILL_TERMS = {
-    "accounting",
-    "analytics",
-    "budgeting",
-    "communication",
-    "content strategy",
-    "customer service",
-    "data analysis",
-    "excel",
-    "fastapi",
-    "financial modeling",
-    "javascript",
-    "leadership",
-    "marketing",
-    "negotiation",
-    "operations",
-    "project management",
-    "python",
-    "react",
-    "sales",
-    "sql",
-    "stakeholder management",
-    "typescript",
-}
-
-TOOL_TERMS = {
-    "aws",
-    "docker",
-    "excel",
-    "figma",
-    "git",
-    "github",
-    "jira",
-    "looker",
-    "power bi",
-    "salesforce",
-    "slack",
-    "tableau",
-}
-
-SOFT_SKILLS = {
-    "adaptability",
-    "collaboration",
-    "communication",
-    "critical thinking",
-    "leadership",
-    "problem solving",
-    "stakeholder management",
-    "time management",
-}
 
 SENIORITY_TERMS = ("intern", "junior", "associate", "mid", "senior", "lead", "principal", "manager")
 
@@ -78,7 +28,7 @@ def parse_job_description(text: str) -> StructuredJobDescription:
 
     required_skills = _extract_terms(required_text or cleaned, SKILL_TERMS)
     preferred_skills = _extract_terms(preferred_text, SKILL_TERMS)
-    tools = _extract_terms(cleaned, TOOL_TERMS)
+    tools = _extract_terms(cleaned, TOOL_SKILLS)
     soft_skills = _extract_terms(cleaned, SOFT_SKILLS)
     responsibilities = _extract_bullets(responsibilities_text, limit=8)
     education = _extract_education(education_text or cleaned)

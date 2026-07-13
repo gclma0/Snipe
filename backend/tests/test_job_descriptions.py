@@ -80,6 +80,25 @@ def test_parse_job_description_extracts_structured_requirements() -> None:
     assert result.seniority == "senior"
 
 
+def test_parse_job_description_extracts_broader_skill_taxonomy() -> None:
+    result = parse_job_description(
+        """
+Healthcare Administrative Assistant
+Requirements:
+- Patient care coordination, medical billing, scheduling, and documentation.
+- Strong customer service, attention to detail, and conflict resolution.
+Preferred Qualifications:
+- Experience with data entry, compliance, and Microsoft Office.
+"""
+    )
+
+    assert "patient care" in result.required_skills
+    assert "medical billing" in result.required_skills
+    assert "documentation" in result.required_skills
+    assert "microsoft office" in result.tools
+    assert "attention to detail" in result.soft_skills
+
+
 def test_create_job_description_from_text_persists_structured_result() -> None:
     fake = FakeSupabaseClient()
     client = client_with_fake_supabase(fake)

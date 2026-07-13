@@ -59,3 +59,37 @@ BS Finance
     assert result.normalized_json["contact"]["emails"] == ["jordan@example.com"]
     assert "experience_section" in fact_types
     assert "skill" in fact_types
+
+
+def test_build_normalized_profile_extracts_broader_professional_skills() -> None:
+    parsed = ResumeParseResult(
+        parser="test-parser",
+        source_type="resume_pdf",
+        text="""
+Taylor Morgan
+Summary
+Administrative coordinator with scheduling, documentation, vendor management, and data entry.
+Skills
+Microsoft Office, Google Sheets, customer service, event planning, attention to detail
+Experience
+Coordinated weekly schedules and maintained compliance documentation.
+""",
+        text_length=280,
+        page_count=1,
+    )
+
+    result = build_normalized_profile(parsed=parsed, profile_id="profile-id", source_id="source-id")
+
+    skills = {skill["name"] for skill in result.normalized_json["skills"]}
+    assert {
+        "administration",
+        "attention to detail",
+        "customer service",
+        "data entry",
+        "documentation",
+        "event planning",
+        "google sheets",
+        "microsoft office",
+        "scheduling",
+        "vendor management",
+    }.issubset(skills)

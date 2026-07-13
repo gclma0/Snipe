@@ -330,6 +330,26 @@ describe("ResumeWorkflow", () => {
         },
       ],
       {
+        document_id: "doc-1",
+        title: "Updated Data Analyst Job Listing",
+        source_type: "job_listing",
+        content_hash: "updated-content-hash",
+        chunk_count: 2,
+        embedding_model: "deterministic-hashing-v1",
+      },
+      [
+        {
+          document_id: "doc-1",
+          title: "Updated Data Analyst Job Listing",
+          source_type: "job_listing",
+          source_url: "https://example.com/jobs/data-updated",
+          content_hash: "updated-content-hash",
+          embedding_model: "deterministic-hashing-v1",
+          metadata: {},
+          created_at: "2026-07-13T12:10:00Z",
+        },
+      ],
+      {
         query: "python sql analytics",
         embedding_model: "deterministic-hashing-v1",
         citations: [
@@ -382,7 +402,20 @@ describe("ResumeWorkflow", () => {
     await user.click(screen.getByRole("button", { name: /Add reference/i }));
 
     expect(await screen.findByText(/Added Data Analyst Job Listing as 2 searchable chunk/i)).toBeInTheDocument();
-    expect(screen.getByText("Data Analyst Job Listing")).toBeInTheDocument();
+    expect(screen.getAllByText("Data Analyst Job Listing").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: /^Edit$/i }));
+    await user.clear(screen.getByLabelText(/^Title$/i));
+    await user.type(screen.getByLabelText(/^Title$/i), "Updated Data Analyst Job Listing");
+    await user.clear(screen.getByLabelText(/Source URL/i));
+    await user.type(screen.getByLabelText(/Source URL/i), "https://example.com/jobs/data-updated");
+    await user.type(
+      screen.getByLabelText(/Reference text/i),
+      "Updated Python SQL analytics dashboards stakeholder reporting ".repeat(4),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace selected/i }));
+
+    expect(await screen.findByText(/Reference replaced/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Updated Data Analyst Job Listing").length).toBeGreaterThan(0);
     await user.clear(screen.getByLabelText(/^Query$/i));
     await user.type(screen.getByLabelText(/^Query$/i), "python sql analytics");
     await user.selectOptions(screen.getByLabelText(/Reference results/i), "5");
@@ -406,6 +439,18 @@ describe("ResumeWorkflow", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/rag/documents?limit=20"),
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer token" }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/documents/doc-1"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          title: "Updated Data Analyst Job Listing",
+          source_type: "job_listing",
+          source_url: "https://example.com/jobs/data-updated",
+          text: "Updated Python SQL analytics dashboards stakeholder reporting ".repeat(4).trim(),
+        }),
+        method: "PUT",
+      }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/rag/search"),

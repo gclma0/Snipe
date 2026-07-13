@@ -12,6 +12,7 @@ const sourceTypeOptions: { value: RagSourceType; label: string }[] = [
 type RagReferencePanelProps = {
   documentResult: RagDocumentResult | null;
   documents: RagDocumentSummary[];
+  editingDocument: RagDocumentSummary | null;
   searchResult: RagSearchResult | null;
   jobSearchResult: RagSearchResult | null;
   isBusy: boolean;
@@ -31,15 +32,19 @@ type RagReferencePanelProps = {
   onLimitChange: (value: number) => void;
   onSearchSourceTypesChange: (value: RagSourceType[]) => void;
   onIngest: () => void;
+  onCancelEditDocument: () => void;
   onDeleteDocument: (documentId: string) => void;
+  onEditDocument: (document: RagDocumentSummary) => void;
   onLoadDocuments: () => void;
   onJobSearch: () => void;
+  onReplaceDocument: () => void;
   onSearch: () => void;
 };
 
 export function RagReferencePanel({
   documentResult,
   documents,
+  editingDocument,
   searchResult,
   jobSearchResult,
   isBusy,
@@ -59,14 +64,22 @@ export function RagReferencePanel({
   onLimitChange,
   onSearchSourceTypesChange,
   onIngest,
+  onCancelEditDocument,
   onDeleteDocument,
+  onEditDocument,
   onLoadDocuments,
   onJobSearch,
+  onReplaceDocument,
   onSearch,
 }: RagReferencePanelProps) {
   return (
     <div className="mt-5 border-t border-border pt-5 text-sm">
       <h3 className="text-base font-semibold">Reference library</h3>
+      {editingDocument ? (
+        <div className="mt-3 border border-border bg-muted/30 p-3">
+          <p className="font-medium">Editing {editingDocument.title}</p>
+        </div>
+      ) : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block text-sm font-medium">
           Title
@@ -121,6 +134,27 @@ export function RagReferencePanel({
         <Database aria-hidden="true" className="h-4 w-4" />
         Add reference
       </button>
+      {editingDocument ? (
+        <>
+          <button
+            className="ml-0 mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:ml-2"
+            disabled={isBusy}
+            type="button"
+            onClick={onReplaceDocument}
+          >
+            <Database aria-hidden="true" className="h-4 w-4" />
+            Replace selected
+          </button>
+          <button
+            className="ml-0 mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:ml-2"
+            disabled={isBusy}
+            type="button"
+            onClick={onCancelEditDocument}
+          >
+            Cancel edit
+          </button>
+        </>
+      ) : null}
       {documentResult ? (
         <p className="mt-3 text-muted-foreground">
           Added {documentResult.title} as {documentResult.chunk_count} searchable chunk(s).
@@ -154,15 +188,25 @@ export function RagReferencePanel({
                       <p className="mt-1 break-all text-xs text-muted-foreground">{item.source_url}</p>
                     ) : null}
                   </div>
-                  <button
-                    className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
-                    disabled={isBusy || deletingDocumentId === item.document_id}
-                    type="button"
-                    onClick={() => onDeleteDocument(item.document_id)}
-                  >
-                    <Trash2 aria-hidden="true" className="h-4 w-4" />
-                    {deletingDocumentId === item.document_id ? "Deleting" : "Delete"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
+                      disabled={isBusy}
+                      type="button"
+                      onClick={() => onEditDocument(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
+                      disabled={isBusy || deletingDocumentId === item.document_id}
+                      type="button"
+                      onClick={() => onDeleteDocument(item.document_id)}
+                    >
+                      <Trash2 aria-hidden="true" className="h-4 w-4" />
+                      {deletingDocumentId === item.document_id ? "Deleting" : "Delete"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

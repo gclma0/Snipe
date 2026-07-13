@@ -88,6 +88,7 @@ import {
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
+  replaceRagDocument,
   searchJobRagReferences,
   searchRagReferences,
   startMockInterview,
@@ -130,6 +131,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentSummary[]>([]);
+  const [editingRagDocument, setEditingRagDocument] = useState<RagDocumentSummary | null>(null);
   const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
   const [jobRagSearchResult, setJobRagSearchResult] = useState<RagSearchResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
@@ -1262,6 +1264,51 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  function handleEditRagDocument(document: RagDocumentSummary) {
+    setEditingRagDocument(document);
+    setRagTitle(document.title);
+    setRagSourceType(document.source_type);
+    setRagSourceUrl(document.source_url ?? "");
+    setRagText("");
+    setMessage("Paste the updated reference text, then replace the selected reference.");
+  }
+
+  function handleCancelEditRagDocument() {
+    setEditingRagDocument(null);
+    setMessage("Reference edit canceled.");
+  }
+
+  async function handleReplaceRagDocument() {
+    if (!accessToken || !editingRagDocument) {
+      return;
+    }
+
+    if (!ragTitle.trim() || ragText.trim().length < 100) {
+      setMessage("Reference title and at least 100 characters of replacement text are required.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await replaceRagDocument(accessToken, editingRagDocument.document_id, {
+        title: ragTitle.trim(),
+        source_type: ragSourceType,
+        source_url: ragSourceUrl.trim() || null,
+        text: ragText.trim(),
+      });
+      setRagDocumentResult(result);
+      const documents = await listRagDocuments(accessToken);
+      setRagDocuments(documents);
+      setEditingRagDocument(null);
+      setMessage("Reference replaced.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not replace reference.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleSearchRagReferences() {
     if (!accessToken) {
       return;
@@ -1391,6 +1438,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               deletingDocumentId={deletingRagDocumentId}
               documentResult={ragDocumentResult}
               documents={ragDocuments}
+              editingDocument={editingRagDocument}
               isBusy={isBusy}
               jobSearchResult={jobRagSearchResult}
               limit={ragLimit}
@@ -1401,12 +1449,15 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               sourceUrl={ragSourceUrl}
               text={ragText}
               title={ragTitle}
+              onCancelEditDocument={handleCancelEditRagDocument}
               onDeleteDocument={handleDeleteRagDocument}
+              onEditDocument={handleEditRagDocument}
               onIngest={handleIngestRagReference}
               onJobSearch={handleSearchJobRagReferences}
               onLimitChange={setRagLimit}
               onLoadDocuments={handleLoadRagDocuments}
               onQueryChange={setRagQuery}
+              onReplaceDocument={handleReplaceRagDocument}
               onSearch={handleSearchRagReferences}
               onSearchSourceTypesChange={setRagSearchSourceTypes}
               onSourceTypeChange={setRagSourceType}

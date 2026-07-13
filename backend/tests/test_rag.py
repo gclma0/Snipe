@@ -35,6 +35,24 @@ class FakeSupabaseClient:
         self.chunks.extend(rows)
         return rows
 
+    def update_rag_document(
+        self,
+        *,
+        user_id: str,
+        document_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        assert user_id == TEST_USER_ID
+        for index, document in enumerate(self.documents):
+            if document["id"] == document_id:
+                self.documents[index] = {**document, **payload}
+                return self.documents[index]
+        return None
+
+    def delete_rag_chunks(self, *, user_id: str, document_id: str) -> None:
+        assert user_id == TEST_USER_ID
+        self.chunks = [chunk for chunk in self.chunks if chunk["document_id"] != document_id]
+
     def list_rag_documents(self, *, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
         assert user_id == TEST_USER_ID
         return list(reversed(self.documents))[:limit]
@@ -234,6 +252,39 @@ def test_rag_api_lists_and_deletes_documents() -> None:
     assert delete_response.json() == {"document_id": "doc-1", "deleted": True}
     assert fake.documents == []
     assert fake.chunks == []
+
+
+def test_rag_api_replaces_document_and_rebuilds_chunks() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+    client.post(
+        "/api/v1/rag/documents",
+        json={
+            "title": "Old Guidance",
+            "source_type": "career_guidance",
+            "text": "Python SQL analytics dashboards stakeholder reporting " * 30,
+        },
+    )
+    response = client.put(
+        "/api/v1/rag/documents/doc-1",
+        json={
+            "title": "Updated Job Listing",
+            "source_type": "job_listing",
+            "source_url": "https://example.com/jobs/updated",
+            "text": "FastAPI PostgreSQL API testing backend observability " * 30,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["document_id"] == "doc-1"
+    assert body["title"] == "Updated Job Listing"
+    assert body["source_type"] == "job_listing"
+    assert fake.documents[0]["title"] == "Updated Job Listing"
+    assert fake.documents[0]["source_url"] == "https://example.com/jobs/updated"
+    assert fake.chunks
+    assert all(chunk["document_id"] == "doc-1" for chunk in fake.chunks)
+    assert "FastAPI PostgreSQL" in fake.chunks[0]["content"]
 
 
 def test_rag_api_delete_returns_not_found_for_missing_document() -> None:

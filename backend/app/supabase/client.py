@@ -383,6 +383,50 @@ class SupabaseClient:
             raise SupabaseError(f"RAG chunk insert failed: {response.text[:300]}")
         return response.json()
 
+    def update_rag_document(
+        self,
+        *,
+        user_id: str,
+        document_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.patch(
+                f"{self.base_url}/rest/v1/rag_documents",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                params={
+                    "id": f"eq.{document_id}",
+                    "user_id": f"eq.{user_id}",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG document update failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
+
+    def delete_rag_chunks(
+        self,
+        *,
+        user_id: str,
+        document_id: str,
+    ) -> None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.delete(
+                f"{self.base_url}/rest/v1/rag_chunks",
+                headers=self.headers,
+                params={
+                    "document_id": f"eq.{document_id}",
+                    "user_id": f"eq.{user_id}",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG chunk delete failed: {response.text[:300]}")
+
     def list_rag_documents(
         self,
         *,

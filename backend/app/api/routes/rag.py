@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.jobs.retrieval import retrieve_job_references
-from app.rag.ingestion import ingest_rag_document
+from app.rag.ingestion import ingest_rag_document, replace_rag_document
 from app.rag.retrieval import retrieve_rag_chunks
 from app.rag.schemas import (
     RagDocumentDeletionResult,
@@ -80,6 +80,33 @@ def delete_rag_document(
                 detail="RAG document not found.",
             )
         return RagDocumentDeletionResult(document_id=document_id, deleted=True)
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+
+@router.put("/documents/{document_id}", response_model=RagDocumentResult)
+def replace_existing_rag_document(
+    document_id: str,
+    payload: RagDocumentIngestion,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> RagDocumentResult:
+    try:
+        result = replace_rag_document(
+            document_id,
+            payload,
+            user_id=user.id,
+            supabase=supabase,
+        )
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="RAG document not found.",
+            )
+        return result
     except SupabaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

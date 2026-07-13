@@ -562,6 +562,32 @@ export function deleteRagDocument(token: string, documentId: string) {
   );
 }
 
+export function replaceRagDocument(
+  token: string,
+  documentId: string,
+  payload: {
+    title: string;
+    source_type: RagSourceType;
+    text: string;
+    source_url?: string | null;
+  },
+) {
+  return request<RagDocumentResult>(
+    `/rag/documents/${encodeURIComponent(documentId)}`,
+    token,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...payload,
+        source_url: payload.source_url || null,
+      }),
+    },
+  );
+}
+
 export function searchRagReferences(
   token: string,
   payload: {

@@ -225,6 +225,26 @@ def test_local_resume_rewrite_alternate_mode_changes_suggestion() -> None:
     assert default_result.suggestions[0].suggested != alternate_result.suggestions[0].suggested
 
 
+def test_local_interpretation_alternate_mode_changes_summary() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_ai_interpretation_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interpretation(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interpretation(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.recommendations[0].title != alternate_result.recommendations[0].title
+
+
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:
     fake = FakeSupabaseClient(
         profile={
@@ -414,3 +434,50 @@ def test_resume_rewrite_force_regenerate_bypasses_cached_output(monkeypatch) -> 
     assert response.json()["summary"] == "Rewrite suggestions are evidence-bound."
     assert fake.outputs
     assert FakeAIClient.rewrite_prompts[0]["generation_mode"] == "alternate"
+
+
+def test_interpretation_force_regenerate_bypasses_cached_output(monkeypatch) -> None:
+    cached_result = AIInterpretationResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached summary.",
+        readiness_explanation="Cached explanation.",
+        recommendations=[
+            AIRecommendation(
+                title="Cached recommendation",
+                rationale="Cached rationale.",
+                action="Cached action.",
+                priority="medium",
+            )
+        ],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/readiness-interpretation",
+        json={"job_description_id": TEST_JOB_ID, "force_regenerate": True},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is False
+    assert (
+        response.json()["summary"]
+        == "Candidate is ready for the target role with focused improvements."
+    )
+    assert fake.outputs
+    assert FakeAIClient.prompts[0]["generation_mode"] == "alternate"

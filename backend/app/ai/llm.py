@@ -184,49 +184,90 @@ class AIClient:
 def _local_template_interpretation(context: dict[str, Any]) -> AIInterpretationResult:
     readiness = context["readiness"]
     skill_gap = context.get("skill_gap") or {}
+    generation_mode = context.get("generation_mode")
     missing = skill_gap.get("missing") or []
     matched = skill_gap.get("matched") or []
     specialization = readiness.get("primary_specialization") or "the target career area"
-    recommendations = [
-        AIRecommendation(
-            title="Strengthen the highest-impact gaps",
-            rationale=(
-                "The current profile has measurable readiness signals, but the target role still "
-                "has unmatched requirements."
+    if generation_mode == "alternate":
+        recommendations = [
+            AIRecommendation(
+                title="Turn gaps into a short evidence plan",
+                rationale=(
+                    "The next improvement should focus on concrete proof for the requirements "
+                    "that are not yet strongly represented."
+                ),
+                action=(
+                    f"Create one real example for each of these areas: {', '.join(missing[:3])}."
+                    if missing
+                    else "Choose one target requirement and add a specific verified example for it."
+                ),
+                priority="high",
             ),
-            action=(
-                f"Prioritize evidence for {', '.join(missing[:3])}."
-                if missing
-                else "Add stronger proof for the most important target-role requirements."
+            AIRecommendation(
+                title="Rebalance the profile around proven strengths",
+                rationale=(
+                    "The strongest existing signals should be repeated consistently across the "
+                    "resume, profile, and supporting sources."
+                ),
+                action=(
+                    f"Use {', '.join(matched[:4])} as the main keyword cluster."
+                    if matched
+                    else "Use the strongest verified skills as the main keyword cluster."
+                ),
+                priority="medium",
             ),
-            priority="high",
-        ),
-        AIRecommendation(
-            title="Make verified strengths easier to scan",
-            rationale=(
-                "Recruiters and ATS systems benefit from repeated, consistent skill evidence."
+        ]
+        summary = (
+            f"Alternate view: the profile is at {readiness['overall']}/100, with the next gains "
+            f"coming from clearer evidence for {specialization}."
+        )
+        explanation = (
+            "This regenerated interpretation uses the same compact structured data, but frames the "
+            "next steps as an evidence plan instead of repeating the default summary."
+        )
+    else:
+        recommendations = [
+            AIRecommendation(
+                title="Strengthen the highest-impact gaps",
+                rationale=(
+                    "The current profile has measurable readiness signals, but the target role "
+                    "still has unmatched requirements."
+                ),
+                action=(
+                    f"Prioritize evidence for {', '.join(missing[:3])}."
+                    if missing
+                    else "Add stronger proof for the most important target-role requirements."
+                ),
+                priority="high",
             ),
-            action=(
-                f"Keep {', '.join(matched[:4])} visible in the resume, profile, and "
-                "project evidence."
-                if matched
-                else "Move the strongest verified skills into the summary and skills sections."
+            AIRecommendation(
+                title="Make verified strengths easier to scan",
+                rationale=(
+                    "Recruiters and ATS systems benefit from repeated, consistent skill evidence."
+                ),
+                action=(
+                    f"Keep {', '.join(matched[:4])} visible in the resume, profile, and "
+                    "project evidence."
+                    if matched
+                    else "Move the strongest verified skills into the summary and skills sections."
+                ),
+                priority="medium",
             ),
-            priority="medium",
-        ),
-    ]
-    return AIInterpretationResult(
-        provider="local_template",
-        model_name="local-template-v1",
-        summary=(
+        ]
+        summary = (
             f"The profile is currently scoring {readiness['overall']}/100 for "
             f"{specialization} readiness."
-        ),
-        readiness_explanation=(
+        )
+        explanation = (
             "Snipe is combining deterministic resume quality, ATS readiness, profile completeness, "
             "and job-specific skill alignment signals. This interpretation uses compact structured "
             "profile data only."
-        ),
+        )
+    return AIInterpretationResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=summary,
+        readiness_explanation=explanation,
         recommendations=recommendations,
         cautions=[
             (

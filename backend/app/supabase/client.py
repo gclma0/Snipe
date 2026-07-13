@@ -324,6 +324,65 @@ class SupabaseClient:
             raise SupabaseError(f"Generated output delete failed: {response.text[:300]}")
         return bool(response.json())
 
+    def create_rag_document(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/rag_documents",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG document insert failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else payload
+
+    def create_rag_chunks(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not payloads:
+            return []
+        with httpx.Client(timeout=30, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/rag_chunks",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payloads,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG chunk insert failed: {response.text[:300]}")
+        return response.json()
+
+    def match_rag_chunks(
+        self,
+        *,
+        user_id: str,
+        query_embedding: list[float],
+        source_types: list[str],
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/rpc/match_rag_chunks",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "match_user_id": user_id,
+                    "query_embedding": query_embedding,
+                    "source_types": source_types,
+                    "match_count": limit,
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"RAG chunk match failed: {response.text[:300]}")
+        return response.json()
+
     def list_profile_storage_paths(self, profile_id: str, user_id: str) -> list[str]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

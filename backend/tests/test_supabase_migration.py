@@ -12,6 +12,12 @@ JOB_DESCRIPTIONS_MIGRATION = (
     / "migrations"
     / "002_job_descriptions.sql"
 )
+RAG_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "supabase"
+    / "migrations"
+    / "003_rag.sql"
+)
 
 
 def test_initial_migration_defines_core_tables_and_storage_bucket() -> None:
@@ -55,3 +61,17 @@ def test_job_descriptions_migration_defines_owned_table_and_rls() -> None:
     assert "alter table public.job_descriptions enable row level security" in sql
     assert "job_descriptions_select_own" in sql
     assert "auth.uid() = user_id" in sql
+
+
+def test_rag_migration_defines_vector_tables_rls_and_match_function() -> None:
+    sql = RAG_MIGRATION.read_text(encoding="utf-8").lower()
+
+    assert 'create extension if not exists "vector"' in sql
+    assert "create table if not exists public.rag_documents" in sql
+    assert "create table if not exists public.rag_chunks" in sql
+    assert "embedding vector(64)" in sql
+    assert "alter table public.rag_documents enable row level security" in sql
+    assert "alter table public.rag_chunks enable row level security" in sql
+    assert "rag_documents_select_own" in sql
+    assert "rag_chunks_select_own" in sql
+    assert "create or replace function public.match_rag_chunks" in sql

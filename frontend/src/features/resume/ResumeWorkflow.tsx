@@ -2,6 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BriefcaseBusiness,
   ClipboardCheck,
+  Copy,
+  Download,
   FileUp,
   Gauge,
   Github,
@@ -378,6 +380,30 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function handleCopyGeneratedOutput(output: GeneratedOutput) {
+    const content = exportContentForOutput(output);
+    try {
+      await navigator.clipboard.writeText(content);
+      setMessage("Saved output copied.");
+    } catch {
+      setMessage("Could not copy saved output.");
+    }
+  }
+
+  function handleDownloadGeneratedOutput(output: GeneratedOutput) {
+    const content = exportContentForOutput(output);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = generatedOutputFilename(output);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage("Saved output downloaded.");
   }
 
   async function handleCreateAIInterpretation(forceRegenerate = false) {
@@ -873,6 +899,16 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                       <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
                       <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
                     </dl>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCopyGeneratedOutput(item)}>
+                        <Copy aria-hidden="true" className="h-4 w-4" />
+                        Copy markdown
+                      </button>
+                      <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleDownloadGeneratedOutput(item)}>
+                        <Download aria-hidden="true" className="h-4 w-4" />
+                        Download .md
+                      </button>
+                    </div>
                     {item.result_markdown ? (
                       <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
                         {item.result_markdown}
@@ -1072,6 +1108,30 @@ function generatedOutputSummary(output: GeneratedOutput) {
     return title;
   }
   return "Saved generated output.";
+}
+
+function exportContentForOutput(output: GeneratedOutput) {
+  if (output.result_markdown?.trim()) {
+    return output.result_markdown;
+  }
+  return [
+    `# ${formatOutputType(output.output_type)}`,
+    "",
+    "```json",
+    JSON.stringify(output.result_json, null, 2),
+    "```",
+    "",
+  ].join("\n");
+}
+
+function generatedOutputFilename(output: GeneratedOutput) {
+  const date = output.created_at ? new Date(output.created_at) : null;
+  const datePart =
+    date && !Number.isNaN(date.getTime())
+      ? date.toISOString().slice(0, 10)
+      : "saved-output";
+  const typePart = output.output_type.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+  return `snipe-${typePart || "output"}-${datePart}.md`.toLowerCase();
 }
 
 function formatOutputDate(value: string | null) {

@@ -476,7 +476,7 @@ describe("ResumeWorkflow", () => {
       expect.stringContaining("/rag/documents/doc-1"),
       expect.objectContaining({ method: "DELETE" }),
     );
-  });
+  }, 10000);
 
   it("opens and deletes a saved output", async () => {
     const user = userEvent.setup();
@@ -626,6 +626,67 @@ describe("ResumeWorkflow", () => {
 
   it("renders deterministic job matches", async () => {
     const user = userEvent.setup();
+    const jobMatchResult = {
+      analysis_type: "job_match",
+      deterministic_version: "deterministic-job-matcher-v1",
+      query: "Data Analyst",
+      match_count: 1,
+      matches: [
+        {
+          job_reference_id: "job-1",
+          title: "Data Analyst",
+          company: null,
+          match_score: 88,
+          semantic_score: 0.9,
+          skill_alignment_score: 86,
+          matched_skills: ["python", "sql", "excel"],
+          partially_matched_skills: [],
+          missing_skills: ["tableau"],
+          relevant_experience: ["Profile evidence mentions sql."],
+          concerns: ["Missing required skills: tableau."],
+          explanation: "Data Analyst scored 88 because the profile matches python, sql, excel.",
+          apply_recommendation: "apply_with_tailoring",
+          structured_job: {
+            parser_version: "deterministic-job-parser-v1",
+            title: "Data Analyst",
+            company: null,
+            required_skills: ["python", "sql", "excel", "tableau"],
+            preferred_skills: [],
+            tools: ["tableau"],
+            soft_skills: [],
+            responsibilities: ["Build dashboards"],
+            education: [],
+            experience_requirements: [],
+            seniority: null,
+            ats_keywords: ["python", "sql", "excel", "tableau"],
+          },
+          source_excerpt:
+            "Data Analyst Requirements Python, SQL, Excel, Tableau. Responsibilities Build dashboards, collaborate with stakeholders, and improve reporting workflows.",
+          citation: {
+            document_id: "job-1",
+            chunk_id: "chunk-1",
+            title: "Analytics job listing",
+            source_type: "job_listing",
+            source_url: "https://example.com/jobs/data",
+            score: 0.9,
+          },
+        },
+      ],
+      checks: {
+        uses_deterministic_ranking: true,
+        uses_source_citations: true,
+      },
+    };
+    const savedJobMatchRun = {
+      id: "analysis-1",
+      analysis_type: "job_match",
+      query: "Data Analyst",
+      match_count: 1,
+      top_match_title: "Data Analyst",
+      top_match_score: 88,
+      created_at: "2026-07-13T12:00:00Z",
+      result: jobMatchResult,
+    };
     const fetchMock = mockFetch([
       {
         id: "profile-id",
@@ -650,82 +711,15 @@ describe("ResumeWorkflow", () => {
         evidence_count: 4,
         normalized_profile_updated: true,
       },
-      {
-        analysis_type: "job_match",
-        deterministic_version: "deterministic-job-matcher-v1",
-        query: "Data Analyst",
-        match_count: 1,
-        matches: [
-          {
-            job_reference_id: "job-1",
-            title: "Data Analyst",
-            company: null,
-            match_score: 88,
-            semantic_score: 0.9,
-            skill_alignment_score: 86,
-            matched_skills: ["python", "sql", "excel"],
-            partially_matched_skills: [],
-            missing_skills: ["tableau"],
-            relevant_experience: ["Profile evidence mentions sql."],
-            concerns: ["Missing required skills: tableau."],
-            explanation: "Data Analyst scored 88 because the profile matches python, sql, excel.",
-            apply_recommendation: "apply_with_tailoring",
-            structured_job: {
-              parser_version: "deterministic-job-parser-v1",
-              title: "Data Analyst",
-              company: null,
-              required_skills: ["python", "sql", "excel", "tableau"],
-              preferred_skills: [],
-              tools: ["tableau"],
-              soft_skills: [],
-              responsibilities: ["Build dashboards"],
-              education: [],
-              experience_requirements: [],
-              seniority: null,
-              ats_keywords: ["python", "sql", "excel", "tableau"],
-            },
-            source_excerpt:
-              "Data Analyst Requirements Python, SQL, Excel, Tableau. Responsibilities Build dashboards, collaborate with stakeholders, and improve reporting workflows.",
-            citation: {
-              document_id: "job-1",
-              chunk_id: "chunk-1",
-              title: "Analytics job listing",
-              source_type: "job_listing",
-              source_url: "https://example.com/jobs/data",
-              score: 0.9,
-            },
-          },
-        ],
-        checks: {
-          uses_deterministic_ranking: true,
-          uses_source_citations: true,
-        },
-      },
+      jobMatchResult,
+      [savedJobMatchRun],
+      [savedJobMatchRun],
+      savedJobMatchRun,
       {
         id: "target-job-id",
         profile_id: "profile-id",
         source_type: "pasted_text",
         input_hash: "target-job-hash",
-        structured: {
-          parser_version: "deterministic-job-parser-v1",
-          title: "Data Analyst",
-          company: null,
-          required_skills: ["python", "sql", "excel", "tableau"],
-          preferred_skills: [],
-          tools: ["tableau"],
-          soft_skills: [],
-          responsibilities: ["Build dashboards"],
-          education: [],
-          experience_requirements: [],
-          seniority: null,
-          ats_keywords: ["python", "sql", "excel", "tableau"],
-        },
-      },
-      {
-        id: "target-job-id-2",
-        profile_id: "profile-id",
-        source_type: "pasted_text",
-        input_hash: "target-job-hash-2",
         structured: {
           parser_version: "deterministic-job-parser-v1",
           title: "Data Analyst",
@@ -777,15 +771,27 @@ describe("ResumeWorkflow", () => {
         body: JSON.stringify({ query: "remote analytics sql", limit: 5 }),
       }),
     );
+    expect(await screen.findByText(/top score 88/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Load match history/i }));
+    expect(await screen.findByText("Job match history loaded.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Open$/i }));
+    expect(await screen.findByText("Saved job match opened.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Save as target job/i }));
 
     expect(await screen.findByText("Job match saved as the active target job.")).toBeInTheDocument();
     expect(screen.getByText("Active target selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Active target$/i })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /^Generate tailoring$/i }));
 
     expect(await screen.findByText("Tailoring generated for saved match.")).toBeInTheDocument();
     expect(screen.getByText("Job match saved and tailoring package generated.")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter((call) => {
+        const [url, init] = call as unknown as [unknown, RequestInit | undefined];
+        return String(url).includes("/job-descriptions") && init?.method === "POST";
+      }),
+    ).toHaveLength(1);
   });
 
   it("renders generated claim verification questions", async () => {

@@ -22,6 +22,13 @@ class FakeSupabaseClient:
     analyses: list[dict[str, Any]] = field(default_factory=list)
     requested_limit: int | None = None
 
+    def profile_belongs_to_user(self, profile_id: str, user_id: str) -> bool:
+        return (
+            profile_id == TEST_PROFILE_ID
+            and user_id == TEST_USER_ID
+            and self.profile is not None
+        )
+
     def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
         if profile_id != TEST_PROFILE_ID or user_id != TEST_USER_ID:
             return None
@@ -42,8 +49,48 @@ class FakeSupabaseClient:
         return self.rows[:limit]
 
     def create_analysis(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.analyses.append(payload)
-        return {**payload, "id": "analysis-1"}
+        row = {
+            **payload,
+            "id": f"analysis-{len(self.analyses) + 1}",
+            "created_at": "2026-07-13T12:00:00Z",
+        }
+        self.analyses.append(row)
+        return row
+
+    def list_analyses(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        analysis_type: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        assert user_id == TEST_USER_ID
+        assert profile_id == TEST_PROFILE_ID
+        return [
+            analysis
+            for analysis in self.analyses
+            if analysis["analysis_type"] == analysis_type
+        ][:limit]
+
+    def get_analysis(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        analysis_id: str,
+        analysis_type: str,
+    ) -> dict[str, Any] | None:
+        assert user_id == TEST_USER_ID
+        assert profile_id == TEST_PROFILE_ID
+        return next(
+            (
+                analysis
+                for analysis in self.analyses
+                if analysis["id"] == analysis_id and analysis["analysis_type"] == analysis_type
+            ),
+            None,
+        )
 
 
 def client_with_fake_supabase(fake: FakeSupabaseClient) -> TestClient:
@@ -193,6 +240,46 @@ def test_job_match_endpoint_returns_ranked_matches_and_persists_analysis() -> No
     assert fake.requested_limit == 5
     assert fake.analyses[0]["analysis_type"] == "job_match"
     assert fake.analyses[0]["profile_version"] == 3
+
+
+def test_job_match_endpoint_lists_and_returns_saved_runs() -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 3,
+            "preferred_role": "Data Analyst",
+            "normalized_json": normalized_profile(),
+        },
+        rows=[
+            {
+                "document_id": "job-1",
+                "chunk_id": "chunk-1",
+                "title": "Data Analyst",
+                "source_type": "job_listing",
+                "source_url": "https://example.com/jobs/data",
+                "chunk_index": 0,
+                "content": job_text("Data Analyst", "Python, SQL, Excel", "communication"),
+                "score": 0.9,
+                "metadata": {},
+            }
+        ],
+    )
+    client = client_with_fake_supabase(fake)
+    client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/job-matches",
+        json={"query": "data analyst", "limit": 5},
+    )
+
+    list_response = client.get(f"/api/v1/profiles/{TEST_PROFILE_ID}/job-matches")
+    get_response = client.get(f"/api/v1/profiles/{TEST_PROFILE_ID}/job-matches/analysis-1")
+
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["id"] == "analysis-1"
+    assert list_response.json()[0]["top_match_title"] == "Data Analyst"
+    assert list_response.json()[0]["top_match_score"] > 0
+    assert get_response.status_code == 200
+    assert get_response.json()["result"]["matches"][0]["title"] == "Data Analyst"
 
 
 def test_job_match_endpoint_requires_existing_normalized_profile() -> None:

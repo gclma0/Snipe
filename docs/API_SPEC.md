@@ -93,13 +93,13 @@ Deletes or detaches a source and triggers profile re-evaluation if needed.
 
 ## Analysis
 
-### POST `/profiles/{profile_id}/analyses/resume`
+### POST `/profiles/{profile_id}/analyses/resume-quality`
 
 Runs resume-quality analysis.
 
 MVP. Primarily deterministic with optional AI explanation.
 
-### POST `/profiles/{profile_id}/analyses/ats`
+### POST `/profiles/{profile_id}/analyses/ats-readiness`
 
 Runs platform-defined ATS-readiness scoring.
 
@@ -112,17 +112,13 @@ Body may include:
 
 Detects primary and secondary specialization, estimated seniority, confidence, and evidence.
 
-### POST `/profiles/{profile_id}/analyses/readiness`
+### POST `/profiles/{profile_id}/analyses/readiness-dashboard`
 
 Generates career-readiness dashboard scores from current profile and available analyses.
 
-### GET `/profiles/{profile_id}/analyses`
+### POST `/profiles/{profile_id}/analyses/profile-completeness`
 
-Lists analysis history.
-
-### GET `/profiles/{profile_id}/analyses/{analysis_id}`
-
-Returns one analysis result.
+Runs platform-defined profile-completeness scoring.
 
 ## Job Descriptions
 
@@ -146,17 +142,25 @@ Extracts:
 
 Lists target job descriptions.
 
-### GET `/profiles/{profile_id}/job-descriptions/{job_description_id}`
+### POST `/profiles/{profile_id}/job-descriptions/upload`
 
-Returns structured job description.
+Creates a target job description from an uploaded PDF or DOCX document.
 
-### POST `/profiles/{profile_id}/job-descriptions/{job_description_id}/skill-gap`
+### POST `/profiles/{profile_id}/analyses/skill-gap`
 
 Runs deterministic skill-gap comparison with optional AI explanation.
 
-### POST `/profiles/{profile_id}/job-descriptions/{job_description_id}/match`
+### POST `/profiles/{profile_id}/job-matches`
 
 Phase 3 endpoint for job match scoring and explanation.
+
+### GET `/profiles/{profile_id}/job-matches`
+
+Lists saved deterministic job-match runs.
+
+### GET `/profiles/{profile_id}/job-matches/{analysis_id}`
+
+Returns a saved deterministic job-match run.
 
 ## Generated Outputs
 
@@ -167,39 +171,39 @@ All generation endpoints must:
 - Avoid fabricating unsupported facts.
 - Return evidence references when applicable.
 
-### POST `/profiles/{profile_id}/generate/resume-bullets`
+### POST `/profiles/{profile_id}/ai/resume-rewrite-suggestions`
 
 Phase 2. Rewrites selected resume bullets.
 
-### POST `/profiles/{profile_id}/generate/professional-summary`
+### POST `/profiles/{profile_id}/ai/readiness-interpretation`
 
 Phase 2. Generates or improves profile summaries.
 
-### POST `/profiles/{profile_id}/generate/linkedin`
+### POST `/profiles/{profile_id}/ai/linkedin`
 
 Phase 2. Generates requested LinkedIn sections.
 
-### POST `/profiles/{profile_id}/job-descriptions/{job_description_id}/generate/cover-letter`
+### POST `/profiles/{profile_id}/ai/application-materials`
 
 Phase 2. Generates selected cover letter format.
 
-### POST `/profiles/{profile_id}/job-descriptions/{job_description_id}/generate/resume-tailoring`
+### POST `/profiles/{profile_id}/ai/resume-tailoring-package`
 
 Phase 2. Generates job-specific resume tailoring recommendations.
 
-### POST `/profiles/{profile_id}/generate/projects`
+### POST `/profiles/{profile_id}/ai/project-roadmap-recommendations`
 
 Phase 2. Generates personalized project recommendations.
 
-### POST `/profiles/{profile_id}/generate/roadmap`
+### POST `/profiles/{profile_id}/ai/project-roadmap-recommendations`
 
 Phase 2. Generates 7-day, 30-day, 90-day, or six-month roadmap.
 
-### POST `/profiles/{profile_id}/generate/learning-plan`
+### POST `/profiles/{profile_id}/ai/learning-plan`
 
 Phase 2. Generates daily, weekly, or monthly plan.
 
-### POST `/profiles/{profile_id}/generate/recruiter-outreach`
+### POST `/profiles/{profile_id}/ai/outreach-message-pack`
 
 Phase 3. Generates outreach content.
 
@@ -213,7 +217,7 @@ Phase 3. Generates personalized interview questions.
 
 Phase 3. Starts a mock interview session.
 
-### POST `/profiles/{profile_id}/interview/sessions/{session_id}/messages`
+### POST `/profiles/{profile_id}/interview/sessions/messages`
 
 Phase 3. Sends an answer and receives evaluation plus follow-up.
 
@@ -221,13 +225,13 @@ Phase 3. Sends an answer and receives evaluation plus follow-up.
 
 Phase 3. Evaluates a standalone answer.
 
-### POST `/profiles/{profile_id}/interview/claim-verification`
+### POST `/profiles/{profile_id}/ai/claim-verification-questions`
 
 Phase 3. Generates claim verification questions and evidence-strength notes. Must not describe the system as lie detection.
 
 ## Reports
 
-### POST `/profiles/{profile_id}/reports`
+### POST `/profiles/{profile_id}/reports/basic`
 
 Generates a downloadable career report.
 
@@ -251,25 +255,61 @@ Later phases add:
 - Interview questions.
 - LinkedIn recommendations.
 
-### GET `/profiles/{profile_id}/reports`
+### POST `/profiles/{profile_id}/reports/full`
 
-Lists reports.
+Generates a full report from available analyses and saved generated outputs.
 
-### GET `/profiles/{profile_id}/reports/{report_id}/download`
+## RAG
 
-Returns a signed download URL or streams the report after ownership checks.
+### POST `/rag/documents`
+
+Ingests a reference document for job listings, job descriptions, role frameworks, or career guidance.
+
+### GET `/rag/documents`
+
+Lists saved RAG reference documents.
+
+### PUT `/rag/documents/{document_id}`
+
+Replaces a saved RAG reference and rebuilds its chunks.
+
+### DELETE `/rag/documents/{document_id}`
+
+Deletes a saved RAG reference and its chunks.
+
+### POST `/rag/search`
+
+Searches RAG references, optionally filtered by source type.
+
+### POST `/rag/jobs/search`
+
+Searches only job listing and job description references.
+
+## Saved Outputs
+
+### GET `/profiles/{profile_id}/generated-outputs`
+
+Lists completed generated outputs.
+
+### GET `/profiles/{profile_id}/generated-outputs/{output_id}`
+
+Returns one generated output.
+
+### DELETE `/profiles/{profile_id}/generated-outputs/{output_id}`
+
+Deletes one generated output.
 
 ## Privacy
 
-### GET `/privacy/data-summary`
+### GET `/profiles/{profile_id}/privacy/data-summary`
 
 Shows what user data is stored.
 
-### POST `/privacy/delete-documents`
+### DELETE `/profiles/{profile_id}/privacy/documents`
 
 Deletes raw uploaded documents while retaining allowed parsed profile facts, if selected by the user.
 
-### POST `/privacy/delete-my-data`
+### DELETE `/profiles/{profile_id}/privacy`
 
 Deletes the user's application data according to the product policy.
 

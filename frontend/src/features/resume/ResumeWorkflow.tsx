@@ -38,6 +38,7 @@ import {
   JobDescriptionResult,
   JobMatch,
   JobMatchResult,
+  SavedJobMatchRun,
   LinkedInSourceResult,
   MockInterviewSession,
   OutreachMessagePack,
@@ -78,8 +79,10 @@ import {
   deleteRagDocument,
   getPrivacyDataSummary,
   getGeneratedOutput,
+  getSavedJobMatch,
   listGeneratedOutputs,
   listJobDescriptions,
+  listSavedJobMatches,
   listProfiles,
   listRagDocuments,
   runAtsReadinessAnalysis,
@@ -113,6 +116,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [linkedInResult, setLinkedInResult] = useState<LinkedInSourceResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
   const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
+  const [savedJobMatches, setSavedJobMatches] = useState<SavedJobMatchRun[]>([]);
+  const [jobMatchTargetIds, setJobMatchTargetIds] = useState<Record<string, string>>({});
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [fullReportResult, setFullReportResult] = useState<FullCareerReportResult | null>(null);
@@ -144,6 +149,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [isSavedOutputsLoading, setIsSavedOutputsLoading] = useState(false);
   const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
+  const [isJobMatchHistoryLoading, setIsJobMatchHistoryLoading] = useState(false);
   const [jobMatchQuery, setJobMatchQuery] = useState("");
   const [jobMatchLimit, setJobMatchLimit] = useState(10);
   const [ragTitle, setRagTitle] = useState("");
@@ -366,6 +372,36 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       return null;
     }
 
+    const existingTargetId = jobMatchTargetIds[match.job_reference_id];
+    if (existingTargetId && jobResult?.id === existingTargetId) {
+      return jobResult;
+    }
+
+    const existingTarget = existingTargetId
+      ? jobOptions.find((job) => job.id === existingTargetId) ?? null
+      : null;
+    if (existingTarget) {
+      setJobResult(existingTarget);
+      setSkillGapResult(null);
+      setDashboardResult(null);
+      setReportResult(null);
+      setFullReportResult(null);
+      setAiInterpretationResult(null);
+      setRewriteResult(null);
+      setTailoringResult(null);
+      setInterviewResult(null);
+      setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
+      setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
+      setSelectedGeneratedOutput(null);
+      return existingTarget;
+    }
+
     if (match.source_excerpt.trim().length < 100) {
       setMessage("This job match does not include enough source text to save as a target job.");
       return null;
@@ -374,6 +410,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     const result = await createJobDescription(accessToken, profile.id, match.source_excerpt);
     setJobResult(result);
     setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
+    if (result.id) {
+      setJobMatchTargetIds((current) => ({
+        ...current,
+        [match.job_reference_id]: result.id ?? "",
+      }));
+    }
     setSkillGapResult(null);
     setDashboardResult(null);
     setReportResult(null);
@@ -1128,12 +1170,55 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         jobMatchLimit,
       );
       setJobMatchResult(result);
+      const savedRuns = await listSavedJobMatches(accessToken, profile.id);
+      setSavedJobMatches(savedRuns);
       setMessage(result.matches.length ? "Job matches ranked." : "No job references found yet.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not retrieve job matches.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
+    }
+  }
+
+  async function handleLoadJobMatchHistory() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsJobMatchHistoryLoading(true);
+    setMessage(null);
+    try {
+      const runs = await listSavedJobMatches(accessToken, profile.id);
+      setSavedJobMatches(runs);
+      setMessage(runs.length ? "Job match history loaded." : "No saved job matches found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load job match history.");
+    } finally {
+      setIsJobMatchHistoryLoading(false);
+    }
+  }
+
+  async function handleOpenSavedJobMatch(analysisId: string) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsJobMatchHistoryLoading(true);
+    setMessage(null);
+    try {
+      const run = await getSavedJobMatch(accessToken, profile.id, analysisId);
+      setJobMatchResult(run.result);
+      setJobMatchQuery(run.query);
+      setSavedJobMatches((current) => [
+        run,
+        ...current.filter((item) => item.id !== run.id),
+      ]);
+      setMessage("Saved job match opened.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not open saved job match.");
+    } finally {
+      setIsJobMatchHistoryLoading(false);
     }
   }
 
@@ -1421,15 +1506,19 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
           />
           <TargetJobForm
             isBusy={isBusy}
+            isJobMatchHistoryLoading={isJobMatchHistoryLoading}
             isVisible={Boolean(profile)}
             jobForm={jobForm}
             jobOptions={jobOptions}
             matchLimit={jobMatchLimit}
             matchQuery={jobMatchQuery}
+            savedJobMatches={savedJobMatches}
             selectedJobId={jobResult?.id ?? null}
             onCreateJobDescription={handleCreateJobDescription}
+            onLoadJobMatchHistory={handleLoadJobMatchHistory}
             onMatchLimitChange={setJobMatchLimit}
             onMatchQueryChange={setJobMatchQuery}
+            onOpenSavedJobMatch={handleOpenSavedJobMatch}
             onRunJobMatches={handleRunJobMatches}
             onSelectJobDescription={handleSelectJobDescription}
           />
@@ -1467,6 +1556,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             />
           ) : null}
           <JobAnalysisResults
+            activeJobMatchTargetIds={jobMatchTargetIds}
             dashboardResult={dashboardResult}
             hasUploadResult={Boolean(uploadResult)}
             isBusy={isBusy}

@@ -65,6 +65,7 @@ type JobAnalysisResultsProps = {
   skillGapResult: SkillGapResult | null;
   dashboardResult: ReadinessDashboardResult | null;
   jobMatchResult: JobMatchResult | null;
+  activeJobMatchTargetIds: Record<string, string>;
   isBusy: boolean;
   hasUploadResult: boolean;
   onRunSkillGap: () => void;
@@ -77,6 +78,7 @@ export function JobAnalysisResults({
   skillGapResult,
   dashboardResult,
   jobMatchResult,
+  activeJobMatchTargetIds,
   isBusy,
   hasUploadResult,
   onRunSkillGap,
@@ -139,45 +141,53 @@ export function JobAnalysisResults({
             <p className="text-xs text-muted-foreground">{jobMatchResult.match_count} ranked</p>
           </div>
           <div className="mt-4 grid gap-3">
-            {jobMatchResult.matches.map((item) => (
-              <div key={`${item.job_reference_id}-${item.citation.chunk_id ?? "chunk"}`} className="border border-border p-3">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-2xl font-semibold">{item.match_score}</p>
+            {jobMatchResult.matches.map((item) => {
+              const isActiveTarget = Boolean(
+                jobResult?.id && activeJobMatchTargetIds[item.job_reference_id] === jobResult.id,
+              );
+              return (
+                <div key={`${item.job_reference_id}-${item.citation.chunk_id ?? "chunk"}`} className="border border-border p-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      {isActiveTarget ? <p className="mt-1 text-xs text-muted-foreground">Active target</p> : null}
+                    </div>
+                    <p className="text-2xl font-semibold">{item.match_score}</p>
+                  </div>
+                  <p className="mt-2 text-muted-foreground">{item.explanation}</p>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <JobField label="Recommendation" values={[formatApplyRecommendation(item.apply_recommendation)]} />
+                    <JobField label="Skill alignment" values={[String(item.skill_alignment_score)]} />
+                    <JobField label="Matched" values={item.matched_skills.slice(0, 8)} />
+                    <JobField label="Missing" values={item.missing_skills.slice(0, 8)} />
+                    <JobField label="Relevant experience" values={item.relevant_experience.slice(0, 3)} />
+                    <JobField label="Concerns" values={item.concerns.slice(0, 4)} />
+                  </dl>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Source: {item.citation.title}
+                    {item.citation.source_url ? ` (${item.citation.source_url})` : ""}
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy || isActiveTarget} type="button" onClick={() => onSaveJobMatchAsTarget(item)}>
+                      <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                      {isActiveTarget ? "Active target" : "Save as target job"}
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "tailoring")}>
+                      <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                      Generate tailoring
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "interview")}>
+                      <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                      Generate interview prep
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "materials")}>
+                      <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                      Generate materials
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-2 text-muted-foreground">{item.explanation}</p>
-                <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <JobField label="Recommendation" values={[formatApplyRecommendation(item.apply_recommendation)]} />
-                  <JobField label="Skill alignment" values={[String(item.skill_alignment_score)]} />
-                  <JobField label="Matched" values={item.matched_skills.slice(0, 8)} />
-                  <JobField label="Missing" values={item.missing_skills.slice(0, 8)} />
-                  <JobField label="Relevant experience" values={item.relevant_experience.slice(0, 3)} />
-                  <JobField label="Concerns" values={item.concerns.slice(0, 4)} />
-                </dl>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Source: {item.citation.title}
-                  {item.citation.source_url ? ` (${item.citation.source_url})` : ""}
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onSaveJobMatchAsTarget(item)}>
-                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
-                    Save as target job
-                  </button>
-                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "tailoring")}>
-                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
-                    Generate tailoring
-                  </button>
-                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "interview")}>
-                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
-                    Generate interview prep
-                  </button>
-                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "materials")}>
-                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
-                    Generate materials
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}

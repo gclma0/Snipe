@@ -26,6 +26,17 @@ class JobMatchRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=20)
 
 
+class SavedJobMatchRun(BaseModel):
+    id: str
+    analysis_type: str
+    query: str
+    match_count: int
+    top_match_title: str | None = None
+    top_match_score: int | None = None
+    created_at: str | None = None
+    result: JobMatchResult
+
+
 @router.post("", response_model=JobMatchResult, status_code=status.HTTP_201_CREATED)
 def create_job_matches(
     profile_id: str,
@@ -84,6 +95,72 @@ def create_job_matches(
         ) from exc
 
     return result
+
+
+@router.get("", response_model=list[SavedJobMatchRun])
+def list_job_match_runs(
+    profile_id: str,
+    limit: int = 20,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> list[SavedJobMatchRun]:
+    try:
+        if not supabase.profile_belongs_to_user(profile_id=profile_id, user_id=user.id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+        rows = supabase.list_analyses(
+            user_id=user.id,
+            profile_id=profile_id,
+            analysis_type=ANALYSIS_TYPE,
+            limit=max(1, min(limit, 50)),
+        )
+        return [_saved_run_from_row(row) for row in rows]
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+
+@router.get("/{analysis_id}", response_model=SavedJobMatchRun)
+def get_job_match_run(
+    profile_id: str,
+    analysis_id: str,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> SavedJobMatchRun:
+    try:
+        row = supabase.get_analysis(
+            user_id=user.id,
+            profile_id=profile_id,
+            analysis_id=analysis_id,
+            analysis_type=ANALYSIS_TYPE,
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job match run not found.",
+            )
+        return _saved_run_from_row(row)
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+
+def _saved_run_from_row(row: dict) -> SavedJobMatchRun:
+    result = JobMatchResult(**(row.get("result_json") or {}))
+    top_match = result.matches[0] if result.matches else None
+    return SavedJobMatchRun(
+        id=row["id"],
+        analysis_type=row.get("analysis_type") or ANALYSIS_TYPE,
+        query=result.query,
+        match_count=result.match_count,
+        top_match_title=top_match.title if top_match else None,
+        top_match_score=top_match.match_score if top_match else None,
+        created_at=row.get("created_at"),
+        result=result,
+    )
 
 
 def _job_match_input_hash(

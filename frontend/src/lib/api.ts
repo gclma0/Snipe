@@ -37,6 +37,7 @@ export type {
   ApplicationMaterialsResult,
   JobMatch,
   JobMatchResult,
+  SavedJobMatchRun,
   GeneratedOutput,
   ProfileDeletionResult,
   PrivacyDataSummaryResult,
@@ -74,6 +75,7 @@ import type {
   ProjectRoadmapResult,
   ApplicationMaterialsResult,
   JobMatchResult,
+  SavedJobMatchRun,
   GeneratedOutput,
   ProfileDeletionResult,
   PrivacyDataSummaryResult,
@@ -197,6 +199,20 @@ export function runJobMatches(
     },
     body: JSON.stringify({ query: query || null, limit }),
   });
+}
+
+export function listSavedJobMatches(token: string, profileId: string, limit = 20) {
+  return request<SavedJobMatchRun[]>(
+    `/profiles/${profileId}/job-matches?limit=${encodeURIComponent(String(limit))}`,
+    token,
+  );
+}
+
+export function getSavedJobMatch(token: string, profileId: string, analysisId: string) {
+  return request<SavedJobMatchRun>(
+    `/profiles/${profileId}/job-matches/${encodeURIComponent(analysisId)}`,
+    token,
+  );
 }
 
 export function createBasicReport(

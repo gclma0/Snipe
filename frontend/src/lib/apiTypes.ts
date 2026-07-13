@@ -408,6 +408,17 @@ export type JobMatchResult = {
   checks: Record<string, boolean>;
 };
 
+export type SavedJobMatchRun = {
+  id: string;
+  analysis_type: string;
+  query: string;
+  match_count: number;
+  top_match_title: string | null;
+  top_match_score: number | null;
+  created_at: string | null;
+  result: JobMatchResult;
+};
+
 export type GeneratedOutput = {
   id: string;
   output_type: string;

@@ -2,19 +2,23 @@ import { BriefcaseBusiness } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 
 import { JobDescriptionValues } from "@/features/resume/resumeWorkflowForms";
-import { JobDescriptionResult } from "@/lib/api";
+import { JobDescriptionResult, SavedJobMatchRun } from "@/lib/api";
 
 type TargetJobFormProps = {
   isVisible: boolean;
   isBusy: boolean;
   jobForm: UseFormReturn<JobDescriptionValues>;
   jobOptions: JobDescriptionResult[];
+  savedJobMatches: SavedJobMatchRun[];
+  isJobMatchHistoryLoading: boolean;
   matchLimit: number;
   matchQuery: string;
   selectedJobId: string | null;
   onCreateJobDescription: (values: JobDescriptionValues) => void;
+  onLoadJobMatchHistory: () => void;
   onMatchLimitChange: (value: number) => void;
   onMatchQueryChange: (value: string) => void;
+  onOpenSavedJobMatch: (analysisId: string) => void;
   onRunJobMatches: () => void;
   onSelectJobDescription: (jobId: string) => void;
 };
@@ -24,12 +28,16 @@ export function TargetJobForm({
   isBusy,
   jobForm,
   jobOptions,
+  savedJobMatches,
+  isJobMatchHistoryLoading,
   matchLimit,
   matchQuery,
   selectedJobId,
   onCreateJobDescription,
+  onLoadJobMatchHistory,
   onMatchLimitChange,
   onMatchQueryChange,
+  onOpenSavedJobMatch,
   onRunJobMatches,
   onSelectJobDescription,
 }: TargetJobFormProps) {
@@ -101,6 +109,33 @@ export function TargetJobForm({
           <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
           Run job match search
         </button>
+        <button className="ml-0 mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:ml-2" disabled={isBusy || isJobMatchHistoryLoading} type="button" onClick={onLoadJobMatchHistory}>
+          <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
+          Load match history
+        </button>
+        {isJobMatchHistoryLoading ? <p className="mt-3 text-sm text-muted-foreground">Loading match history...</p> : null}
+        {savedJobMatches.length ? (
+          <div className="mt-4 grid gap-3">
+            {savedJobMatches.map((run) => (
+              <div key={run.id} className="border border-border p-3 text-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-medium">{run.top_match_title ?? "Saved job match run"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {run.match_count} match(es)
+                      {run.top_match_score === null ? "" : ` - top score ${run.top_match_score}`}
+                      {run.created_at ? ` - ${new Date(run.created_at).toLocaleDateString()}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Query: {run.query}</p>
+                  </div>
+                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onOpenSavedJobMatch(run.id)}>
+                    Open
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </form>
   );

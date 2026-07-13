@@ -156,6 +156,65 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def list_analyses(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        analysis_type: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/analyses",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,analysis_type,input_hash,profile_version,deterministic_version,"
+                        "result_json,score,status,created_at"
+                    ),
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "analysis_type": f"eq.{analysis_type}",
+                    "status": "eq.completed",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Analysis list failed: {response.text[:300]}")
+        return response.json()
+
+    def get_analysis(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        analysis_id: str,
+        analysis_type: str,
+    ) -> dict[str, Any] | None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/analyses",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,analysis_type,input_hash,profile_version,deterministic_version,"
+                        "result_json,score,status,created_at"
+                    ),
+                    "id": f"eq.{analysis_id}",
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "analysis_type": f"eq.{analysis_type}",
+                    "status": "eq.completed",
+                    "limit": "1",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Analysis fetch failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
+
     def create_job_description(self, payload: dict[str, Any]) -> dict[str, Any]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.post(

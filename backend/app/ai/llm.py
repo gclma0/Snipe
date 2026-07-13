@@ -45,6 +45,30 @@ class ResumeRewriteResult(BaseModel):
     cached: bool = False
 
 
+class KeywordInsertionRecommendation(BaseModel):
+    keyword: str
+    placement: str
+    reason: str
+    evidence_status: str = Field(pattern="^(verified|missing_evidence)$")
+
+
+class ResumeTailoringPackageResult(BaseModel):
+    output_type: str = "ai_resume_tailoring_package"
+    output_version: str = "ai-resume-tailoring-package-v1"
+    provider: str
+    model_name: str
+    summary: str
+    tailored_summary: str
+    skill_order: list[str] = Field(default_factory=list, max_length=20)
+    keyword_recommendations: list[KeywordInsertionRecommendation] = Field(
+        default_factory=list,
+        max_length=12,
+    )
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class AIProviderError(RuntimeError):
     pass
 
@@ -67,6 +91,16 @@ class AIClient:
             return _local_template_resume_rewrite(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._openai_compatible_resume_rewrite(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_resume_tailoring_package(
+        self,
+        context: dict[str, Any],
+    ) -> ResumeTailoringPackageResult:
+        if self.provider == "local_template":
+            return _local_template_resume_tailoring(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._openai_compatible_resume_tailoring(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
@@ -140,6 +174,29 @@ class AIClient:
             )
         except (TypeError, ValidationError) as exc:
             raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def _openai_compatible_resume_tailoring(
+        self,
+        context: dict[str, Any],
+    ) -> ResumeTailoringPackageResult:
+        parsed = self._openai_compatible_json(
+            task=(
+                "Create an evidence-bound resume tailoring package with a tailored summary, "
+                "skill ordering, keyword placement recommendations, missing-evidence warnings, "
+                "and cautions. Do not invent skills, achievements, metrics, employers, or "
+                "experience."
+            ),
+            context=context,
+        )
+        try:
+            return ResumeTailoringPackageResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
 
     def _openai_compatible_json(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
         if not self.settings.ai_api_key:
@@ -411,6 +468,74 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
     )
 
 
+def _local_template_resume_tailoring(context: dict[str, Any]) -> ResumeTailoringPackageResult:
+    verified_skills = context.get("verified_skills") or []
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    required = _string_list(
+        target_job.get("required_skills") if isinstance(target_job, dict) else []
+    )
+    preferred = _string_list(
+        target_job.get("preferred_skills") if isinstance(target_job, dict) else []
+    )
+    ats_keywords = _string_list(
+        target_job.get("ats_keywords") if isinstance(target_job, dict) else []
+    )
+    matched = _string_list(skill_gap.get("matched") if isinstance(skill_gap, dict) else [])
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    verified_lookup = {skill.lower(): skill for skill in verified_skills}
+    ordered_skills = _ordered_tailored_skills(
+        verified_skills=verified_skills,
+        required=required,
+        preferred=preferred,
+        ats_keywords=ats_keywords,
+        matched=matched,
+    )
+    keyword_recommendations = _keyword_recommendations(
+        ordered_skills=ordered_skills,
+        missing=missing,
+        required=required,
+        verified_lookup=verified_lookup,
+    )
+    missing_warnings = [
+        (
+            f"{keyword} appears important for the target role, but Snipe did not find "
+            "supporting evidence. Add it only if it is true and backed by experience, "
+            "projects, education, certification, portfolio, or LinkedIn evidence."
+        )
+        for keyword in missing[:6]
+    ]
+    if not verified_skills:
+        missing_warnings.insert(
+            0,
+            (
+                "No verified skills were found in the profile. Add a real skills section before "
+                "tailoring keywords."
+            ),
+        )
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    tailored_summary = _tailored_summary(role=role, ordered_skills=ordered_skills)
+    return ResumeTailoringPackageResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Tailoring package generated from verified skills and target-job requirements."
+            if verified_skills
+            else "Tailoring is limited because no verified skills were found."
+        ),
+        tailored_summary=tailored_summary,
+        skill_order=ordered_skills,
+        keyword_recommendations=keyword_recommendations,
+        missing_evidence_warnings=missing_warnings,
+        cautions=[
+            (
+                "Do not add keywords, tools, achievements, or metrics unless they are true and "
+                "supported by real evidence."
+            )
+        ],
+    )
+
+
 def _rewrite_evidence(
     *,
     verified_skills: list[str],
@@ -422,6 +547,93 @@ def _rewrite_evidence(
     matched_verified = sorted(verified & {skill.lower() for skill in matched})
     target_verified = sorted(verified & normalized_targets)
     return matched_verified[:3] or target_verified[:3] or verified_skills[:3]
+
+
+def _ordered_tailored_skills(
+    *,
+    verified_skills: list[str],
+    required: list[str],
+    preferred: list[str],
+    ats_keywords: list[str],
+    matched: list[str],
+) -> list[str]:
+    verified_lookup = {skill.lower(): skill for skill in verified_skills}
+    priority_terms = required + preferred + ats_keywords + matched
+    ordered: list[str] = []
+    for term in priority_terms:
+        key = term.lower()
+        if key in verified_lookup and verified_lookup[key] not in ordered:
+            ordered.append(verified_lookup[key])
+    for skill in verified_skills:
+        if skill not in ordered:
+            ordered.append(skill)
+    return ordered[:20]
+
+
+def _keyword_recommendations(
+    *,
+    ordered_skills: list[str],
+    missing: list[str],
+    required: list[str],
+    verified_lookup: dict[str, str],
+) -> list[KeywordInsertionRecommendation]:
+    recommendations: list[KeywordInsertionRecommendation] = []
+    for skill in ordered_skills[:8]:
+        recommendations.append(
+            KeywordInsertionRecommendation(
+                keyword=skill,
+                placement="skills section and one relevant experience bullet",
+                reason="This skill is verified and should be easy for ATS/recruiters to scan.",
+                evidence_status="verified",
+            )
+        )
+    for keyword in missing[:4]:
+        if keyword.lower() not in verified_lookup:
+            recommendations.append(
+                KeywordInsertionRecommendation(
+                    keyword=keyword,
+                    placement="do not add until supporting evidence exists",
+                    reason=(
+                        "This target keyword is not currently supported by verified profile data."
+                    ),
+                    evidence_status="missing_evidence",
+                )
+            )
+    if not recommendations and required:
+        for keyword in required[:4]:
+            recommendations.append(
+                KeywordInsertionRecommendation(
+                    keyword=keyword,
+                    placement="add only after real supporting evidence is available",
+                    reason="This requirement appears in the target job but is not verified.",
+                    evidence_status="missing_evidence",
+                )
+            )
+    return recommendations[:12]
+
+
+def _tailored_summary(role: str | None, ordered_skills: list[str]) -> str:
+    if ordered_skills:
+        skill_text = ", ".join(ordered_skills[:4])
+        if role:
+            return (
+                f"Candidate targeting {role} roles with verified experience signals in "
+                f"{skill_text}. Add only true outcomes and scope details where supported."
+            )
+        return (
+            f"Candidate with verified experience signals in {skill_text}. Add only true "
+            "outcomes and scope details where supported."
+        )
+    if role:
+        return (
+            f"Candidate targeting {role} roles. Add real, supported skills and evidence before "
+            "using a tailored summary."
+        )
+    return "Add real, supported skills and evidence before using a tailored summary."
+
+
+def _string_list(value: Any) -> list[str]:
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
 def _rewrite_bullet(

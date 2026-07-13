@@ -8,10 +8,13 @@ from app.ai.llm import (
     AIClient,
     AIInterpretationResult,
     AIRecommendation,
+    KeywordInsertionRecommendation,
     ResumeRewriteResult,
     ResumeRewriteSuggestion,
+    ResumeTailoringPackageResult,
 )
 from app.ai.resume_rewrite import build_resume_rewrite_context
+from app.ai.tailoring import build_resume_tailoring_context
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.core.config import Settings
 from app.main import create_app
@@ -27,6 +30,7 @@ TEST_SECRET = "test-secret-with-at-least-thirty-two-bytes"
 class FakeAIClient:
     prompts: list[dict[str, Any]] = []
     rewrite_prompts: list[dict[str, Any]] = []
+    tailoring_prompts: list[dict[str, Any]] = []
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -64,6 +68,29 @@ class FakeAIClient:
                 )
             ],
             cautions=["Do not invent unsupported metrics."],
+        )
+
+    def generate_resume_tailoring_package(
+        self,
+        context: dict[str, Any],
+    ) -> ResumeTailoringPackageResult:
+        self.tailoring_prompts.append(context)
+        return ResumeTailoringPackageResult(
+            provider="fake",
+            model_name="fake-model",
+            summary="Tailoring package is evidence-bound.",
+            tailored_summary="Operations analyst with verified Excel, SQL, and operations signals.",
+            skill_order=["excel", "sql", "operations"],
+            keyword_recommendations=[
+                KeywordInsertionRecommendation(
+                    keyword="excel",
+                    placement="skills section",
+                    reason="Verified and relevant.",
+                    evidence_status="verified",
+                )
+            ],
+            missing_evidence_warnings=["Add communication only if supported by real evidence."],
+            cautions=["Do not invent unsupported skills."],
         )
 
 
@@ -164,6 +191,7 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
 
     FakeAIClient.prompts = []
     FakeAIClient.rewrite_prompts = []
+    FakeAIClient.tailoring_prompts = []
     monkeypatch.setattr(ai_route, "AIClient", FakeAIClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
@@ -308,6 +336,36 @@ def test_local_resume_rewrite_explains_missing_skill_evidence() -> None:
 
     assert "no verified skills were found" in result.summary.lower()
     assert "add only real skills" in result.cautions[0].lower()
+
+
+def test_resume_tailoring_context_excludes_raw_resume_sections() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_resume_tailoring_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
+    assert "RAW_UNIQUE_EXPERIENCE_PHRASE" not in str(context)
+    assert context["verified_skills"] == ["excel", "operations", "project management", "sql"]
+
+
+def test_local_resume_tailoring_warns_about_missing_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_resume_tailoring_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_tailoring_package(context)
+
+    assert "limited" in result.summary.lower()
+    assert result.missing_evidence_warnings
+    assert result.keyword_recommendations[0].evidence_status == "missing_evidence"
 
 
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:
@@ -546,3 +604,73 @@ def test_interpretation_force_regenerate_bypasses_cached_output(monkeypatch) -> 
     )
     assert fake.outputs
     assert FakeAIClient.prompts[0]["generation_mode"] == "alternate"
+
+
+def test_resume_tailoring_endpoint_generates_and_persists(monkeypatch) -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/resume-tailoring-package",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["provider"] == "fake"
+    assert body["skill_order"] == ["excel", "sql", "operations"]
+    assert fake.outputs[0]["output_type"] == "ai_resume_tailoring_package"
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.tailoring_prompts[0])
+
+
+def test_resume_tailoring_endpoint_returns_cached_output(monkeypatch) -> None:
+    cached_result = ResumeTailoringPackageResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached tailoring.",
+        tailored_summary="Cached summary.",
+        skill_order=["excel"],
+        keyword_recommendations=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/resume-tailoring-package",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is True
+    assert response.json()["summary"] == "Cached tailoring."
+    assert fake.outputs == []
+    assert FakeAIClient.tailoring_prompts == []

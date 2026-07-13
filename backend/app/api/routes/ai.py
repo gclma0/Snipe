@@ -2,8 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.ai.context import ai_context_hash, build_ai_interpretation_context
-from app.ai.llm import AIClient, AIInterpretationResult, AIProviderError, ResumeRewriteResult
+from app.ai.llm import (
+    AIClient,
+    AIInterpretationResult,
+    AIProviderError,
+    ResumeRewriteResult,
+    ResumeTailoringPackageResult,
+)
 from app.ai.resume_rewrite import build_resume_rewrite_context, rewrite_context_hash
+from app.ai.tailoring import build_resume_tailoring_context, tailoring_context_hash
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.scoring.readiness import build_readiness_dashboard
 from app.supabase.client import SupabaseClient, SupabaseError
@@ -17,6 +24,8 @@ OUTPUT_TYPE = "ai_readiness_interpretation"
 PROMPT_VERSION = "ai-readiness-interpretation-v1"
 REWRITE_OUTPUT_TYPE = "ai_resume_rewrite_suggestions"
 REWRITE_PROMPT_VERSION = "ai-resume-rewrite-suggestions-v1"
+TAILORING_OUTPUT_TYPE = "ai_resume_tailoring_package"
+TAILORING_PROMPT_VERSION = "ai-resume-tailoring-package-v1"
 
 
 class AIInterpretationRequest(BaseModel):
@@ -184,6 +193,86 @@ def create_resume_rewrite_suggestions(
     return result
 
 
+@router.post(
+    "/resume-tailoring-package",
+    response_model=ResumeTailoringPackageResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_resume_tailoring_package(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> ResumeTailoringPackageResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating a tailoring package.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_resume_tailoring_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = tailoring_context_hash(context)
+        if not force_regenerate:
+            cached = supabase.get_generated_output(
+                user_id=user.id,
+                profile_id=profile_id,
+                output_type=TAILORING_OUTPUT_TYPE,
+                input_hash=input_hash,
+                job_description_id=job_description_id,
+            )
+            if cached is not None:
+                result = ResumeTailoringPackageResult(**(cached.get("result_json") or {}))
+                result.cached = True
+                return result
+
+        result = AIClient(supabase.settings).generate_resume_tailoring_package(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": TAILORING_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": TAILORING_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _tailoring_markdown(result),
+                "status": "completed",
+            }
+        )
+    except AIProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
 def _get_structured_job(
     *,
     supabase: SupabaseClient,
@@ -229,6 +318,33 @@ def _rewrite_markdown(result: ResumeRewriteResult) -> str:
                 "",
             ]
         )
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def _tailoring_markdown(result: ResumeTailoringPackageResult) -> str:
+    lines = ["# Snipe Resume Tailoring Package", "", result.summary, ""]
+    lines.extend(["## Tailored Summary", result.tailored_summary, ""])
+    if result.skill_order:
+        lines.append("## Skill Order")
+        lines.extend(f"- {skill}" for skill in result.skill_order)
+        lines.append("")
+    if result.keyword_recommendations:
+        lines.append("## Keyword Recommendations")
+        for item in result.keyword_recommendations:
+            lines.extend(
+                [
+                    f"- {item.keyword}: {item.placement}",
+                    f"  Reason: {item.reason}",
+                ]
+            )
+        lines.append("")
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence Warnings")
+        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
     if result.cautions:
         lines.append("## Cautions")
         lines.extend(f"- {caution}" for caution in result.cautions)

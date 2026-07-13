@@ -164,6 +164,27 @@ export type ResumeRewriteResult = {
   cached: boolean;
 };
 
+export type KeywordInsertionRecommendation = {
+  keyword: string;
+  placement: string;
+  reason: string;
+  evidence_status: "verified" | "missing_evidence";
+};
+
+export type ResumeTailoringPackageResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  tailored_summary: string;
+  skill_order: string[];
+  keyword_recommendations: KeywordInsertionRecommendation[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ProfileDeletionResult = {
   profile_id: string;
   deleted: boolean;
@@ -343,6 +364,24 @@ export function createResumeRewriteSuggestions(
   forceRegenerate = false,
 ) {
   return request<ResumeRewriteResult>(`/profiles/${profileId}/ai/resume-rewrite-suggestions`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      force_regenerate: forceRegenerate,
+    }),
+  });
+}
+
+export function createResumeTailoringPackage(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<ResumeTailoringPackageResult>(`/profiles/${profileId}/ai/resume-tailoring-package`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

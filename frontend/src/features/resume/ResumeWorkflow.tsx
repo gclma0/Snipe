@@ -30,6 +30,7 @@ import {
   ReadinessDashboardResult,
   ResumeQualityResult,
   ResumeRewriteResult,
+  ResumeTailoringPackageResult,
   ResumeUploadResult,
   SkillGapResult,
   addGitHubSource,
@@ -39,6 +40,7 @@ import {
   createBasicReport,
   createJobDescription,
   createResumeRewriteSuggestions,
+  createResumeTailoringPackage,
   createProfile,
   deleteProfileData,
   runAtsReadinessAnalysis,
@@ -96,6 +98,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
+  const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -154,6 +157,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
+      setTailoringResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -177,6 +181,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
+      setTailoringResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -281,6 +286,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
+      setTailoringResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -313,6 +319,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
+      setTailoringResult(null);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -380,6 +387,29 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Rewrite suggestions loaded from cache." : "Rewrite suggestions generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate rewrite suggestions.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateTailoringPackage(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createResumeTailoringPackage(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setTailoringResult(result);
+      setMessage(result.cached ? "Tailoring package loaded from cache." : "Tailoring package generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate tailoring package.");
     } finally {
       setIsBusy(false);
     }
@@ -640,6 +670,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Regenerate rewrite suggestions
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(false)}>
+                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                Generate tailoring package
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateTailoringPackage(true)}>
+                <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                Regenerate tailoring package
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -801,6 +839,46 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               {rewriteResult.cautions.length ? (
                 <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
                   {rewriteResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {tailoringResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Tailoring package</h3>
+                <p className="text-xs text-muted-foreground">
+                  {tailoringResult.cached ? "Cached" : tailoringResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{tailoringResult.summary}</p>
+              <div className="mt-4 border border-border p-3">
+                <p className="font-medium">Tailored summary</p>
+                <p className="mt-1 text-muted-foreground">{tailoringResult.tailored_summary}</p>
+              </div>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <JobField label="Skill order" values={tailoringResult.skill_order} />
+                <JobField
+                  label="Missing evidence"
+                  values={tailoringResult.missing_evidence_warnings.slice(0, 4)}
+                />
+              </dl>
+              {tailoringResult.keyword_recommendations.length ? (
+                <div className="mt-4 grid gap-3">
+                  {tailoringResult.keyword_recommendations.slice(0, 6).map((item) => (
+                    <div key={`${item.keyword}-${item.placement}`} className="border border-border p-3">
+                      <p className="font-medium">{item.keyword}</p>
+                      <p className="mt-1 text-muted-foreground">{item.placement}</p>
+                      <p className="mt-2">{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {tailoringResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {tailoringResult.cautions.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>

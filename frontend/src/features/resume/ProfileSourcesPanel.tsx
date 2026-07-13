@@ -4,29 +4,18 @@ import { UseFormReturn } from "react-hook-form";
 
 import { JobField } from "@/features/resume/resumeDisplay";
 import {
+  GitHubValues,
+  LinkedInValues,
+  PortfolioValues,
+  ProfileValues,
+} from "@/features/resume/resumeWorkflowForms";
+import {
   CandidateProfile,
   GitHubSourceResult,
   LinkedInSourceResult,
   PortfolioSourceResult,
   PrivacyDataSummaryResult,
 } from "@/lib/api";
-
-type ProfileValues = {
-  career_goal: string;
-  preferred_role: string;
-};
-
-type GitHubValues = {
-  username_or_url: string;
-};
-
-type PortfolioValues = {
-  url: string;
-};
-
-type LinkedInValues = {
-  text: string;
-};
 
 type ProfileSourcesPanelProps = {
   profile: CandidateProfile | null;

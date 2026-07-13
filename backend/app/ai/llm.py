@@ -120,6 +120,21 @@ class ProjectRoadmapResult(BaseModel):
     cached: bool = False
 
 
+class ApplicationMaterialsResult(BaseModel):
+    output_type: str = "ai_application_materials"
+    output_version: str = "ai-application-materials-v1"
+    provider: str
+    model_name: str
+    summary: str
+    cover_letter: str
+    concise_cover_note: str
+    email_application: str
+    evidence_used: list[str] = Field(default_factory=list, max_length=8)
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class AIProviderError(RuntimeError):
     pass
 
@@ -166,6 +181,16 @@ class AIClient:
             return _local_template_project_roadmap(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._openai_compatible_project_roadmap(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_application_materials(
+        self,
+        context: dict[str, Any],
+    ) -> ApplicationMaterialsResult:
+        if self.provider == "local_template":
+            return _local_template_application_materials(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._openai_compatible_application_materials(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
@@ -299,6 +324,28 @@ class AIClient:
         )
         try:
             return ProjectRoadmapResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def _openai_compatible_application_materials(
+        self,
+        context: dict[str, Any],
+    ) -> ApplicationMaterialsResult:
+        parsed = self._openai_compatible_json(
+            task=(
+                "Create evidence-bound application materials: a standard cover letter, concise "
+                "cover note, and email application. Use candidate-review placeholders when "
+                "details are missing. Do not invent skills, achievements, metrics, employers, "
+                "credentials, or experience."
+            ),
+            context=context,
+        )
+        try:
+            return ApplicationMaterialsResult(
                 provider=self.provider,
                 model_name=self.model_name,
                 **parsed,
@@ -978,6 +1025,118 @@ def _local_template_project_roadmap(context: dict[str, Any]) -> ProjectRoadmapRe
     )
 
 
+def _local_template_application_materials(
+    context: dict[str, Any],
+) -> ApplicationMaterialsResult:
+    verified_skills = _string_list(context.get("verified_skills"))
+    experience_signals = _string_list(context.get("experience_signals"))
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    readiness = context.get("readiness") or {}
+    generation_mode = context.get("generation_mode")
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    company = target_job.get("company") if isinstance(target_job, dict) else None
+    role_name = role or readiness.get("primary_specialization") or "the target role"
+    company_name = company or "[company name]"
+    matched = _string_list(skill_gap.get("matched") if isinstance(skill_gap, dict) else [])
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    required = _string_list(
+        target_job.get("required_skills") if isinstance(target_job, dict) else []
+    )
+    evidence = _application_evidence(
+        verified_skills=verified_skills,
+        matched=matched,
+        required=required,
+        experience_signals=experience_signals,
+        alternate=generation_mode == "alternate",
+    )
+    skill_text = ", ".join(evidence[:4]) if evidence else "[candidate-verified skills]"
+    experience_text = (
+        experience_signals[0]
+        if experience_signals
+        else "[candidate-verified experience example]"
+    )
+    cover_letter = (
+        f"Dear {company_name} hiring team,\n\n"
+        f"I am interested in the {role_name} opportunity. My strongest verified signals for "
+        f"this role are {skill_text}. In my background, I can point to: {experience_text}. "
+        "I would use the interview process to discuss the real scope, tools, and outcomes I "
+        "can verify.\n\n"
+        "I am especially interested in this role because it aligns with the requirements in "
+        "the job description and gives me a practical path to contribute with evidence-backed "
+        "strengths. Where the role requires skills not yet shown in my profile, I would be "
+        "transparent and discuss my learning plan rather than overstate experience.\n\n"
+        "Thank you for your consideration,\n[candidate name]"
+    )
+    if generation_mode == "alternate":
+        cover_letter = (
+            f"Dear {company_name} hiring team,\n\n"
+            f"I am applying for the {role_name} role with verified strengths in {skill_text}. "
+            f"A relevant evidence signal from my profile is: {experience_text}. I have kept "
+            "this draft limited to details that should be reviewed and confirmed before use.\n\n"
+            "The role appears to value practical execution and clear evidence. I would welcome "
+            "the chance to connect my verified background to your needs and address any gaps "
+            "honestly.\n\n"
+            "Sincerely,\n[candidate name]"
+        )
+    concise_note = (
+        f"I am interested in the {role_name} role at {company_name}. My verified profile "
+        f"signals include {skill_text}. I can share evidence around {experience_text} and "
+        "will only add additional claims after confirming they are accurate."
+    )
+    email_application = (
+        f"Subject: Application for {role_name}\n\n"
+        f"Hello {company_name} hiring team,\n\n"
+        f"I am submitting my application for the {role_name} role. My profile shows verified "
+        f"signals in {skill_text}, with supporting experience such as: {experience_text}.\n\n"
+        "I have attached my resume for review. Please let me know if additional information "
+        "would be helpful.\n\n"
+        "Best,\n[candidate name]"
+    )
+    warnings = [
+        (
+            f"{skill} appears important for the target role, but Snipe did not find verified "
+            "evidence. Do not claim it in application materials until it is true and supported."
+        )
+        for skill in missing[:6]
+    ]
+    if not verified_skills:
+        warnings.insert(
+            0,
+            (
+                "No verified skills were found. Add real skills and evidence before using "
+                "strong application-material claims."
+            ),
+        )
+    return ApplicationMaterialsResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Regenerated application materials use alternate evidence-bound wording."
+            if verified_skills and generation_mode == "alternate"
+            else (
+                "Regenerated application materials are limited because no verified skills were "
+                "found."
+            )
+            if generation_mode == "alternate"
+            else "Application materials generated from verified profile and target-role signals."
+            if verified_skills
+            else "Application materials are limited because no verified skills were found."
+        ),
+        cover_letter=cover_letter,
+        concise_cover_note=concise_note,
+        email_application=email_application,
+        evidence_used=evidence[:8],
+        missing_evidence_warnings=warnings[:8],
+        cautions=[
+            (
+                "Review before sending. Replace placeholders only with true details and do not "
+                "add unsupported skills, metrics, achievements, employers, or credentials."
+            )
+        ],
+    )
+
+
 def _rewrite_evidence(
     *,
     verified_skills: list[str],
@@ -1037,6 +1196,28 @@ def _interview_priority_skills(
     for skill in verified_skills:
         if skill not in ordered:
             ordered.append(skill)
+    return ordered[:8]
+
+
+def _application_evidence(
+    *,
+    verified_skills: list[str],
+    matched: list[str],
+    required: list[str],
+    experience_signals: list[str],
+    alternate: bool = False,
+) -> list[str]:
+    verified_lookup = {skill.lower(): skill for skill in verified_skills}
+    priority_terms = matched + required if alternate else required + matched
+    ordered: list[str] = []
+    for term in priority_terms:
+        key = term.lower()
+        if key in verified_lookup and verified_lookup[key] not in ordered:
+            ordered.append(verified_lookup[key])
+    for skill in verified_skills:
+        if skill not in ordered:
+            ordered.append(skill)
+    ordered.extend(signal for signal in experience_signals[:2] if signal not in ordered)
     return ordered[:8]
 
 

@@ -25,6 +25,7 @@ import { z } from "zod";
 import {
   BasicReportResult,
   AIInterpretationResult,
+  ApplicationMaterialsResult,
   CandidateProfile,
   DeterministicScoreResult,
   GeneratedOutput,
@@ -44,6 +45,7 @@ import {
   addLinkedInTextSource,
   addPortfolioSource,
   createAIReadinessInterpretation,
+  createApplicationMaterials,
   createBasicReport,
   createInterviewPrep,
   createJobDescription,
@@ -101,6 +103,7 @@ const outputTypeFilters = [
   { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
   { value: "ai_interview_prep", label: "Interview prep" },
   { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
+  { value: "ai_application_materials", label: "Application materials" },
 ] as const;
 
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
@@ -121,6 +124,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
+  const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [message, setMessage] = useState<string | null>(null);
@@ -191,6 +195,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Profile created.");
@@ -219,6 +224,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Job description analyzed.");
@@ -328,6 +334,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Resume uploaded and parsed.");
@@ -365,6 +372,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setProjectRoadmapResult(null);
+      setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Profile data deleted.");
@@ -574,6 +582,34 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Project roadmap loaded from cache." : "Project roadmap generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate project roadmap.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateApplicationMaterials(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating application materials..." : "Generating application materials...");
+    setMessage(null);
+    try {
+      const result = await createApplicationMaterials(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setApplicationMaterialsResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(
+        result.cached ? "Application materials loaded from cache." : "Application materials generated.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate application materials.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -876,6 +912,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(true)}>
                       <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
                       Regenerate roadmap
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateApplicationMaterials(false)}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Application materials
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateApplicationMaterials(true)}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Regenerate materials
                     </button>
                   </div>
                 </div>
@@ -1260,6 +1304,49 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               ) : null}
             </div>
           ) : null}
+          {applicationMaterialsResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Application materials</h3>
+                <p className="text-xs text-muted-foreground">
+                  {applicationMaterialsResult.cached ? "Cached" : applicationMaterialsResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{applicationMaterialsResult.summary}</p>
+              <div className="mt-4 grid gap-3">
+                <div className="border border-border p-3">
+                  <p className="font-medium">Cover letter</p>
+                  <pre className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {applicationMaterialsResult.cover_letter}
+                  </pre>
+                </div>
+                <div className="border border-border p-3">
+                  <p className="font-medium">Concise cover note</p>
+                  <p className="mt-2 text-muted-foreground">{applicationMaterialsResult.concise_cover_note}</p>
+                </div>
+                <div className="border border-border p-3">
+                  <p className="font-medium">Email application</p>
+                  <pre className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {applicationMaterialsResult.email_application}
+                  </pre>
+                </div>
+              </div>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <JobField label="Evidence used" values={applicationMaterialsResult.evidence_used} />
+                <JobField
+                  label="Missing evidence"
+                  values={applicationMaterialsResult.missing_evidence_warnings.slice(0, 6)}
+                />
+              </dl>
+              {applicationMaterialsResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {applicationMaterialsResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
       {busyLabel ? <p className="mt-4 text-sm text-muted-foreground">{busyLabel}</p> : null}
@@ -1286,6 +1373,7 @@ function formatOutputType(outputType: string) {
     ai_resume_tailoring_package: "Tailoring package",
     mvp_basic_report: "Basic report",
     ai_project_roadmap_recommendations: "Project roadmap",
+    ai_application_materials: "Application materials",
   };
   return labels[outputType] ?? outputType.replace(/_/g, " ");
 }

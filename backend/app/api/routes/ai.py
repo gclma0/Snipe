@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from app.ai.application_materials import (
+    application_materials_context_hash,
+    build_application_materials_context,
+)
 from app.ai.context import ai_context_hash, build_ai_interpretation_context
 from app.ai.interview import build_interview_prep_context, interview_context_hash
 from app.ai.llm import (
     AIClient,
     AIInterpretationResult,
     AIProviderError,
+    ApplicationMaterialsResult,
     InterviewPrepResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
@@ -34,6 +39,8 @@ INTERVIEW_OUTPUT_TYPE = "ai_interview_prep"
 INTERVIEW_PROMPT_VERSION = "ai-interview-prep-v1"
 PROJECT_ROADMAP_OUTPUT_TYPE = "ai_project_roadmap_recommendations"
 PROJECT_ROADMAP_PROMPT_VERSION = "ai-project-roadmap-v1"
+APPLICATION_MATERIALS_OUTPUT_TYPE = "ai_application_materials"
+APPLICATION_MATERIALS_PROMPT_VERSION = "ai-application-materials-v1"
 
 
 class AIInterpretationRequest(BaseModel):
@@ -441,6 +448,86 @@ def create_project_roadmap_recommendations(
     return result
 
 
+@router.post(
+    "/application-materials",
+    response_model=ApplicationMaterialsResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_application_materials(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> ApplicationMaterialsResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating application materials.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_application_materials_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = application_materials_context_hash(context)
+        if not force_regenerate:
+            cached = supabase.get_generated_output(
+                user_id=user.id,
+                profile_id=profile_id,
+                output_type=APPLICATION_MATERIALS_OUTPUT_TYPE,
+                input_hash=input_hash,
+                job_description_id=job_description_id,
+            )
+            if cached is not None:
+                result = ApplicationMaterialsResult(**(cached.get("result_json") or {}))
+                result.cached = True
+                return result
+
+        result = AIClient(supabase.settings).generate_application_materials(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": APPLICATION_MATERIALS_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": APPLICATION_MATERIALS_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _application_materials_markdown(result),
+                "status": "completed",
+            }
+        )
+    except AIProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
 def _get_structured_job(
     *,
     supabase: SupabaseClient,
@@ -579,6 +666,25 @@ def _project_roadmap_markdown(result: ProjectRoadmapResult) -> str:
                     "",
                 ]
             )
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence Warnings")
+        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def _application_materials_markdown(result: ApplicationMaterialsResult) -> str:
+    lines = ["# Snipe Application Materials", "", result.summary, ""]
+    lines.extend(["## Cover Letter", result.cover_letter, ""])
+    lines.extend(["## Concise Cover Note", result.concise_cover_note, ""])
+    lines.extend(["## Email Application", result.email_application, ""])
+    if result.evidence_used:
+        lines.append("## Evidence Used")
+        lines.extend(f"- {item}" for item in result.evidence_used)
+        lines.append("")
     if result.missing_evidence_warnings:
         lines.append("## Missing Evidence Warnings")
         lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)

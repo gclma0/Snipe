@@ -236,6 +236,21 @@ export type ProjectRoadmapResult = {
   cached: boolean;
 };
 
+export type ApplicationMaterialsResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  cover_letter: string;
+  concise_cover_note: string;
+  email_application: string;
+  evidence_used: string[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type GeneratedOutput = {
   id: string;
   output_type: string;
@@ -483,6 +498,28 @@ export function createProjectRoadmap(
 ) {
   return request<ProjectRoadmapResult>(
     `/profiles/${profileId}/ai/project-roadmap-recommendations`,
+    token,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        job_description_id: jobDescriptionId ?? null,
+        force_regenerate: forceRegenerate,
+      }),
+    },
+  );
+}
+
+export function createApplicationMaterials(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<ApplicationMaterialsResult>(
+    `/profiles/${profileId}/ai/application-materials`,
     token,
     {
       method: "POST",

@@ -21,6 +21,7 @@ class FakeSupabaseClient:
     fail_operation: str | None = None
     deleted_storage: list[str] = field(default_factory=list)
     deleted_profiles: list[dict[str, Any]] = field(default_factory=list)
+    outputs: list[dict[str, Any]] = field(default_factory=lambda: [{"id": "output-1"}])
 
     def profile_belongs_to_user(self, profile_id: str, user_id: str) -> bool:
         return self.owns_profile and profile_id == TEST_PROFILE_ID and user_id == TEST_USER_ID
@@ -40,6 +41,17 @@ class FakeSupabaseClient:
             raise SupabaseError("simulated profile delete failure", operation="profile_delete")
         self.deleted_profiles.append({"profile_id": profile_id, "user_id": user_id})
         return True
+
+    def list_generated_outputs(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        assert user_id == TEST_USER_ID
+        return self.outputs[:limit]
 
 
 def client_with_fake_supabase(fake: FakeSupabaseClient) -> TestClient:
@@ -66,6 +78,33 @@ def test_delete_profile_data_deletes_storage_then_profile() -> None:
     assert body["deleted_storage_objects"] == 1
     assert fake.deleted_storage == ["user/profile/resume.pdf"]
     assert fake.deleted_profiles == [{"profile_id": TEST_PROFILE_ID, "user_id": TEST_USER_ID}]
+
+
+def test_data_summary_reports_documents_outputs_and_retention() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+
+    response = client.get(f"/api/v1/profiles/{TEST_PROFILE_ID}/privacy/data-summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile_exists"] is True
+    assert body["stored_document_count"] == 1
+    assert body["generated_output_count"] == 1
+    assert "private" in body["retention_policy"].lower()
+
+
+def test_delete_documents_keeps_profile() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+
+    response = client.delete(f"/api/v1/profiles/{TEST_PROFILE_ID}/privacy/documents")
+
+    assert response.status_code == 200
+    assert response.json()["profile_retained"] is True
+    assert response.json()["deleted_storage_objects"] == 1
+    assert fake.deleted_storage == ["user/profile/resume.pdf"]
+    assert fake.deleted_profiles == []
 
 
 def test_delete_profile_data_rejects_unowned_profile() -> None:

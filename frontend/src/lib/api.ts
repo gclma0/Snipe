@@ -126,6 +126,15 @@ export type BasicReportResult = {
   markdown: string;
 };
 
+export type FullCareerReportResult = {
+  report_type: string;
+  report_version: string;
+  title: string;
+  summary: string;
+  sections_included: string[];
+  markdown: string;
+};
+
 export type AIRecommendation = {
   title: string;
   rationale: string;
@@ -418,6 +427,20 @@ export type ProfileDeletionResult = {
   deleted_storage_objects: number;
 };
 
+export type PrivacyDataSummaryResult = {
+  profile_id: string;
+  profile_exists: boolean;
+  stored_document_count: number;
+  generated_output_count: number;
+  retention_policy: string;
+};
+
+export type DocumentDeletionResult = {
+  profile_id: string;
+  deleted_storage_objects: number;
+  profile_retained: boolean;
+};
+
 export type GitHubSourceResult = {
   source_id: string | null;
   profile_id: string;
@@ -573,6 +596,20 @@ export function createBasicReport(
   jobDescriptionId?: string | null,
 ) {
   return request<BasicReportResult>(`/profiles/${profileId}/reports/basic`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function createFullReport(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+) {
+  return request<FullCareerReportResult>(`/profiles/${profileId}/reports/full`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -825,6 +862,16 @@ export function deleteGeneratedOutput(token: string, profileId: string, outputId
 
 export function deleteProfileData(token: string, profileId: string) {
   return request<ProfileDeletionResult>(`/profiles/${profileId}/privacy`, token, {
+    method: "DELETE",
+  });
+}
+
+export function getPrivacyDataSummary(token: string, profileId: string) {
+  return request<PrivacyDataSummaryResult>(`/profiles/${profileId}/privacy/data-summary`, token);
+}
+
+export function deleteProfileDocuments(token: string, profileId: string) {
+  return request<DocumentDeletionResult>(`/profiles/${profileId}/privacy/documents`, token, {
     method: "DELETE",
   });
 }

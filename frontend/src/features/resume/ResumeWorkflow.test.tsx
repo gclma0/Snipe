@@ -67,6 +67,9 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("AI generation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resume quality/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Job matches/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Full report/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Data summary/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Delete documents only/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Load history/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate prep/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Claim questions/i })).toBeInTheDocument();
@@ -528,6 +531,67 @@ describe("ResumeWorkflow", () => {
     expect(await screen.findByText("Latest evaluation")).toBeInTheDocument();
     expect(screen.getByText("What was your exact role?")).toBeInTheDocument();
     expect(screen.getByText(/Completed 1 interview turns/i)).toBeInTheDocument();
+  });
+
+  it("renders privacy summary and generated full report", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        profile_id: "profile-id",
+        profile_exists: true,
+        stored_document_count: 1,
+        generated_output_count: 3,
+        retention_policy: "Raw uploaded documents are private.",
+      },
+      {
+        report_type: "full_career_report",
+        report_version: "full-career-report-v1",
+        title: "Snipe Full Career Report: Operations Analyst",
+        summary: "Full career report includes saved generated outputs.",
+        sections_included: ["readiness", "strengths", "ai_interview_prep"],
+        markdown: "# Snipe Full Career Report\n\n## Saved AI Outputs",
+      },
+      [],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /Data summary/i }));
+
+    expect(await screen.findByText("Raw uploaded documents are private.")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Full report/i }));
+
+    expect(await screen.findByText("Snipe Full Career Report: Operations Analyst")).toBeInTheDocument();
+    expect(screen.getByText(/Saved AI Outputs/i)).toBeInTheDocument();
   });
 });
 

@@ -2,6 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
+from app.reports.full_report_builder import (
+    FULL_REPORT_TYPE,
+    FULL_REPORT_VERSION,
+    FullCareerReportResult,
+    build_full_career_report,
+    full_report_input_hash,
+)
 from app.reports.report_builder import (
     REPORT_TYPE,
     REPORT_VERSION,
@@ -65,6 +72,66 @@ def create_basic_report(
                 "job_description_id": job_description_id,
                 "input_hash": input_hash,
                 "prompt_version": REPORT_VERSION,
+                "provider": "deterministic",
+                "model_name": "none",
+                "result_json": result.model_dump(exclude={"markdown"}),
+                "result_markdown": result.markdown,
+                "status": "completed",
+            }
+        )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
+@router.post("/full", response_model=FullCareerReportResult, status_code=status.HTTP_201_CREATED)
+def create_full_report(
+    profile_id: str,
+    payload: BasicReportRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> FullCareerReportResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating a report.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = None
+        if job_description_id:
+            job_description = supabase.get_job_description(
+                job_description_id=job_description_id,
+                profile_id=profile_id,
+                user_id=user.id,
+            )
+            if job_description is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Job description not found.",
+                )
+            structured_job = job_description.get("structured_json") or {}
+
+        outputs = supabase.list_generated_outputs(user_id=user.id, profile_id=profile_id, limit=50)
+        result = build_full_career_report(normalized_profile, structured_job, outputs)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": FULL_REPORT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": full_report_input_hash(normalized_profile, structured_job, outputs),
+                "prompt_version": FULL_REPORT_VERSION,
                 "provider": "deterministic",
                 "model_name": "none",
                 "result_json": result.model_dump(exclude={"markdown"}),

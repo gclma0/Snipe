@@ -32,6 +32,7 @@ import {
   CandidateProfile,
   ClaimVerificationResult,
   DeterministicScoreResult,
+  FullCareerReportResult,
   GeneratedOutput,
   GitHubSourceResult,
   InterviewPrepResult,
@@ -41,6 +42,7 @@ import {
   MockInterviewSession,
   OutreachMessagePack,
   PortfolioSourceResult,
+  PrivacyDataSummaryResult,
   ProjectRoadmapResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
@@ -57,6 +59,7 @@ import {
   createBasicReport,
   createCareerTransitionAnalysis,
   createClaimVerificationQuestions,
+  createFullReport,
   createInterviewPrep,
   createOutreachMessagePack,
   createJobDescription,
@@ -66,6 +69,8 @@ import {
   createProfile,
   deleteGeneratedOutput,
   deleteProfileData,
+  deleteProfileDocuments,
+  getPrivacyDataSummary,
   getGeneratedOutput,
   listGeneratedOutputs,
   runAtsReadinessAnalysis,
@@ -122,6 +127,7 @@ const outputTypeFilters = [
   { value: "ai_career_transition_analysis", label: "Career transition" },
   { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
   { value: "ai_application_materials", label: "Application materials" },
+  { value: "full_career_report", label: "Full reports" },
 ] as const;
 
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
@@ -138,6 +144,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
+  const [fullReportResult, setFullReportResult] = useState<FullCareerReportResult | null>(null);
+  const [privacySummary, setPrivacySummary] = useState<PrivacyDataSummaryResult | null>(null);
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
@@ -218,6 +226,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setFullReportResult(null);
+      setPrivacySummary(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -255,6 +265,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setFullReportResult(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -373,6 +384,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setFullReportResult(null);
+      setPrivacySummary(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -419,6 +432,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
+      setFullReportResult(null);
+      setPrivacySummary(null);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -442,6 +457,42 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleLoadPrivacySummary() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await getPrivacyDataSummary(accessToken, profile.id);
+      setPrivacySummary(result);
+      setMessage("Privacy summary loaded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load privacy summary.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDeleteDocumentsOnly() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await deleteProfileDocuments(accessToken, profile.id);
+      setMessage(`Deleted ${result.deleted_storage_objects} stored document object(s).`);
+      await handleLoadPrivacySummary();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete stored documents.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleCreateReport() {
     if (!accessToken || !profile) {
       return;
@@ -457,6 +508,27 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Basic report generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate report.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateFullReport() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Generating full career report...");
+    setMessage(null);
+    try {
+      const result = await createFullReport(accessToken, profile.id, jobResult?.id ?? null);
+      setFullReportResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage("Full career report generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate full report.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -966,11 +1038,26 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 Upload resume
                 <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleUpload} />
               </label>
-              <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-red-200 px-4 py-2 text-sm font-medium text-red-700" disabled={isBusy} type="button" onClick={handleDeleteProfile}>
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
-                Delete profile data
-              </button>
-            </div>
+        <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-red-200 px-4 py-2 text-sm font-medium text-red-700" disabled={isBusy} type="button" onClick={handleDeleteProfile}>
+          <Trash2 aria-hidden="true" className="h-4 w-4" />
+          Delete profile data
+        </button>
+        <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleLoadPrivacySummary}>
+          <ScrollText aria-hidden="true" className="h-4 w-4" />
+          Data summary
+        </button>
+        <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleDeleteDocumentsOnly}>
+          <Trash2 aria-hidden="true" className="h-4 w-4" />
+          Delete documents only
+        </button>
+        {privacySummary ? (
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <JobField label="Stored documents" values={[String(privacySummary.stored_document_count)]} />
+            <JobField label="Saved outputs" values={[String(privacySummary.generated_output_count)]} />
+            <JobField label="Retention" values={[privacySummary.retention_policy]} />
+          </dl>
+        ) : null}
+      </div>
           ) : null}
           {profile ? (
             <form className="mt-5 border-t border-border pt-5" onSubmit={githubForm.handleSubmit(handleAddGitHub)}>
@@ -1105,6 +1192,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateReport}>
                       <ScrollText aria-hidden="true" className="h-4 w-4" />
                       Basic report
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateFullReport}>
+                      <ScrollText aria-hidden="true" className="h-4 w-4" />
+                      Full report
                     </button>
                   </div>
                 </div>
@@ -1327,6 +1418,21 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               </dl>
               <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
                 {reportResult.markdown}
+              </pre>
+            </div>
+          ) : null}
+          {fullReportResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">{fullReportResult.title}</h3>
+                <p className="text-xs text-muted-foreground">{fullReportResult.report_version}</p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{fullReportResult.summary}</p>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                <JobField label="Sections included" values={fullReportResult.sections_included.slice(0, 12)} />
+              </dl>
+              <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
+                {fullReportResult.markdown}
               </pre>
             </div>
           ) : null}
@@ -1856,6 +1962,7 @@ function formatOutputType(outputType: string) {
     mvp_basic_report: "Basic report",
     ai_project_roadmap_recommendations: "Project roadmap",
     ai_application_materials: "Application materials",
+    full_career_report: "Full report",
   };
   return labels[outputType] ?? outputType.replace(/_/g, " ");
 }

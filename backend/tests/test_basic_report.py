@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.core.config import Settings
 from app.main import create_app
+from app.reports.full_report_builder import build_full_career_report
 from app.reports.report_builder import build_basic_report
 from app.supabase.dependencies import get_supabase_client
 
@@ -45,6 +46,17 @@ class FakeSupabaseClient:
         row = {"id": "output-id", **payload}
         self.outputs.append(row)
         return row
+
+    def list_generated_outputs(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        assert user_id == TEST_USER_ID
+        assert profile_id == TEST_PROFILE_ID
+        return self.outputs[:limit]
 
 
 def client_with_fake_supabase(fake: FakeSupabaseClient) -> TestClient:
@@ -99,6 +111,31 @@ def test_build_basic_report_contains_scores_strengths_and_markdown() -> None:
     assert "## Skill Gaps" in result.markdown
 
 
+def test_build_full_report_includes_saved_outputs() -> None:
+    result = build_full_career_report(
+        normalized_profile(),
+        structured_job(),
+        [
+            {
+                "id": "output-1",
+                "output_type": "ai_interview_prep",
+                "result_markdown": "# Interview Questions\n\nQuestion content.",
+                "result_json": {},
+            },
+            {
+                "id": "output-2",
+                "output_type": "ai_outreach_message_pack",
+                "result_json": {"summary": "Outreach summary."},
+            },
+        ],
+    )
+
+    assert result.report_type == "full_career_report"
+    assert "ai_interview_prep" in result.sections_included
+    assert "Interview Questions" in result.markdown
+    assert "Outreach Messages" in result.markdown
+
+
 def test_basic_report_endpoint_persists_generated_output() -> None:
     fake = FakeSupabaseClient(
         profile={
@@ -127,6 +164,42 @@ def test_basic_report_endpoint_persists_generated_output() -> None:
     assert fake.outputs[0]["output_type"] == "mvp_basic_report"
     assert fake.outputs[0]["provider"] == "deterministic"
     assert fake.outputs[0]["result_markdown"].startswith("# Snipe Career Report")
+
+
+def test_full_report_endpoint_persists_generated_output() -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 7,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        outputs=[
+            {
+                "id": "history-1",
+                "output_type": "ai_interview_prep",
+                "result_markdown": "# Interview Questions",
+                "result_json": {},
+            }
+        ],
+    )
+    client = client_with_fake_supabase(fake)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/reports/full",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["report_type"] == "full_career_report"
+    assert fake.outputs[-1]["output_type"] == "full_career_report"
 
 
 def test_basic_report_endpoint_requires_normalized_profile() -> None:

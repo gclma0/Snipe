@@ -207,6 +207,35 @@ export type InterviewPrepResult = {
   cached: boolean;
 };
 
+export type ProjectRecommendation = {
+  title: string;
+  objective: string;
+  skills_practiced: string[];
+  deliverables: string[];
+  evidence_to_add: string[];
+  missing_evidence_warning: string | null;
+};
+
+export type RoadmapStep = {
+  timeframe: "7_day" | "30_day" | "90_day";
+  focus: string;
+  actions: string[];
+  success_criteria: string[];
+};
+
+export type ProjectRoadmapResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  projects: ProjectRecommendation[];
+  roadmap: RoadmapStep[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type GeneratedOutput = {
   id: string;
   output_type: string;
@@ -444,6 +473,28 @@ export function createInterviewPrep(
       force_regenerate: forceRegenerate,
     }),
   });
+}
+
+export function createProjectRoadmap(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<ProjectRoadmapResult>(
+    `/profiles/${profileId}/ai/project-roadmap-recommendations`,
+    token,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        job_description_id: jobDescriptionId ?? null,
+        force_regenerate: forceRegenerate,
+      }),
+    },
+  );
 }
 
 export function listGeneratedOutputs(token: string, profileId: string, limit = 20) {

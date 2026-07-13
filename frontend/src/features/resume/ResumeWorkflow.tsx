@@ -33,6 +33,7 @@ import {
   JobDescriptionResult,
   LinkedInSourceResult,
   PortfolioSourceResult,
+  ProjectRoadmapResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
   ResumeRewriteResult,
@@ -46,6 +47,7 @@ import {
   createBasicReport,
   createInterviewPrep,
   createJobDescription,
+  createProjectRoadmap,
   createResumeRewriteSuggestions,
   createResumeTailoringPackage,
   createProfile,
@@ -98,6 +100,7 @@ const outputTypeFilters = [
   { value: "ai_resume_rewrite_suggestions", label: "Rewrite suggestions" },
   { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
   { value: "ai_interview_prep", label: "Interview prep" },
+  { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
 ] as const;
 
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
@@ -117,6 +120,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
+  const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [message, setMessage] = useState<string | null>(null);
@@ -186,6 +190,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setProjectRoadmapResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Profile created.");
@@ -213,6 +218,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setProjectRoadmapResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Job description analyzed.");
@@ -321,6 +327,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setProjectRoadmapResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Resume uploaded and parsed.");
@@ -357,6 +364,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setProjectRoadmapResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setMessage("Profile data deleted.");
@@ -540,6 +548,32 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Interview prep loaded from cache." : "Interview prep generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateProjectRoadmap(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating project roadmap..." : "Generating project roadmap...");
+    setMessage(null);
+    try {
+      const result = await createProjectRoadmap(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setProjectRoadmapResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(result.cached ? "Project roadmap loaded from cache." : "Project roadmap generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate project roadmap.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -834,6 +868,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(true)}>
                       <MessageSquare aria-hidden="true" className="h-4 w-4" />
                       Regenerate prep
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(false)}>
+                      <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
+                      Project roadmap
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(true)}>
+                      <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
+                      Regenerate roadmap
                     </button>
                   </div>
                 </div>
@@ -1160,6 +1202,64 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               ) : null}
             </div>
           ) : null}
+          {projectRoadmapResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Project roadmap</h3>
+                <p className="text-xs text-muted-foreground">
+                  {projectRoadmapResult.cached ? "Cached" : projectRoadmapResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{projectRoadmapResult.summary}</p>
+              {projectRoadmapResult.projects.length ? (
+                <div className="mt-4 grid gap-3">
+                  {projectRoadmapResult.projects.map((item) => (
+                    <div key={item.title} className="border border-border p-3">
+                      <p className="font-medium">{item.title}</p>
+                      <p className="mt-1 text-muted-foreground">{item.objective}</p>
+                      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <JobField label="Skills practiced" values={item.skills_practiced} />
+                        <JobField label="Deliverables" values={item.deliverables} />
+                        <JobField label="Evidence to add" values={item.evidence_to_add} />
+                      </dl>
+                      {item.missing_evidence_warning ? (
+                        <p className="mt-2 text-muted-foreground">{item.missing_evidence_warning}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {projectRoadmapResult.roadmap.length ? (
+                <div className="mt-4 grid gap-3">
+                  {projectRoadmapResult.roadmap.map((item) => (
+                    <div key={item.timeframe} className="border border-border p-3">
+                      <p className="font-medium">{formatRoadmapTimeframe(item.timeframe)}</p>
+                      <p className="mt-1 text-muted-foreground">{item.focus}</p>
+                      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <JobField label="Actions" values={item.actions} />
+                        <JobField label="Success criteria" values={item.success_criteria} />
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {projectRoadmapResult.missing_evidence_warnings.length ? (
+                <dl className="mt-4 grid gap-3">
+                  <JobField
+                    label="Missing evidence"
+                    values={projectRoadmapResult.missing_evidence_warnings.slice(0, 6)}
+                  />
+                </dl>
+              ) : null}
+              {projectRoadmapResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {projectRoadmapResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
       {busyLabel ? <p className="mt-4 text-sm text-muted-foreground">{busyLabel}</p> : null}
@@ -1185,6 +1285,7 @@ function formatOutputType(outputType: string) {
     ai_resume_rewrite_suggestions: "Rewrite suggestions",
     ai_resume_tailoring_package: "Tailoring package",
     mvp_basic_report: "Basic report",
+    ai_project_roadmap_recommendations: "Project roadmap",
   };
   return labels[outputType] ?? outputType.replace(/_/g, " ");
 }
@@ -1223,6 +1324,15 @@ function generatedOutputFilename(output: GeneratedOutput) {
       : "saved-output";
   const typePart = output.output_type.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
   return `snipe-${typePart || "output"}-${datePart}.md`.toLowerCase();
+}
+
+function formatRoadmapTimeframe(value: string) {
+  const labels: Record<string, string> = {
+    "7_day": "7-day plan",
+    "30_day": "30-day plan",
+    "90_day": "90-day plan",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
 }
 
 function formatOutputDate(value: string | null) {

@@ -8,10 +8,12 @@ from app.ai.llm import (
     AIInterpretationResult,
     AIProviderError,
     InterviewPrepResult,
+    ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
 )
 from app.ai.resume_rewrite import build_resume_rewrite_context, rewrite_context_hash
+from app.ai.roadmap import build_project_roadmap_context, project_roadmap_context_hash
 from app.ai.tailoring import build_resume_tailoring_context, tailoring_context_hash
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.scoring.readiness import build_readiness_dashboard
@@ -30,6 +32,8 @@ TAILORING_OUTPUT_TYPE = "ai_resume_tailoring_package"
 TAILORING_PROMPT_VERSION = "ai-resume-tailoring-package-v1"
 INTERVIEW_OUTPUT_TYPE = "ai_interview_prep"
 INTERVIEW_PROMPT_VERSION = "ai-interview-prep-v1"
+PROJECT_ROADMAP_OUTPUT_TYPE = "ai_project_roadmap_recommendations"
+PROJECT_ROADMAP_PROMPT_VERSION = "ai-project-roadmap-v1"
 
 
 class AIInterpretationRequest(BaseModel):
@@ -357,6 +361,86 @@ def create_interview_prep(
     return result
 
 
+@router.post(
+    "/project-roadmap-recommendations",
+    response_model=ProjectRoadmapResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_project_roadmap_recommendations(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> ProjectRoadmapResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating project recommendations.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_project_roadmap_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = project_roadmap_context_hash(context)
+        if not force_regenerate:
+            cached = supabase.get_generated_output(
+                user_id=user.id,
+                profile_id=profile_id,
+                output_type=PROJECT_ROADMAP_OUTPUT_TYPE,
+                input_hash=input_hash,
+                job_description_id=job_description_id,
+            )
+            if cached is not None:
+                result = ProjectRoadmapResult(**(cached.get("result_json") or {}))
+                result.cached = True
+                return result
+
+        result = AIClient(supabase.settings).generate_project_roadmap(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": PROJECT_ROADMAP_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": PROJECT_ROADMAP_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _project_roadmap_markdown(result),
+                "status": "completed",
+            }
+        )
+    except AIProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
 def _get_structured_job(
     *,
     supabase: SupabaseClient,
@@ -450,6 +534,48 @@ def _interview_markdown(result: InterviewPrepResult) -> str:
                     item.question,
                     f"Why: {item.why_it_matters}",
                     f"Guidance: {item.answer_guidance}",
+                    "",
+                ]
+            )
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence Warnings")
+        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def _project_roadmap_markdown(result: ProjectRoadmapResult) -> str:
+    lines = ["# Snipe Project Roadmap", "", result.summary, ""]
+    if result.projects:
+        lines.append("## Project Recommendations")
+        for item in result.projects:
+            lines.extend(
+                [
+                    f"### {item.title}",
+                    item.objective,
+                    "",
+                    "Skills practiced:",
+                    *[f"- {skill}" for skill in item.skills_practiced],
+                    "Deliverables:",
+                    *[f"- {deliverable}" for deliverable in item.deliverables],
+                    "",
+                ]
+            )
+    if result.roadmap:
+        lines.append("## Roadmap")
+        for item in result.roadmap:
+            lines.extend(
+                [
+                    f"### {item.timeframe.replace('_', ' ').title()}",
+                    item.focus,
+                    "",
+                    "Actions:",
+                    *[f"- {action}" for action in item.actions],
+                    "Success criteria:",
+                    *[f"- {criterion}" for criterion in item.success_criteria],
                     "",
                 ]
             )

@@ -91,6 +91,35 @@ class InterviewPrepResult(BaseModel):
     cached: bool = False
 
 
+class ProjectRecommendation(BaseModel):
+    title: str
+    objective: str
+    skills_practiced: list[str] = Field(default_factory=list, max_length=8)
+    deliverables: list[str] = Field(default_factory=list, max_length=6)
+    evidence_to_add: list[str] = Field(default_factory=list, max_length=6)
+    missing_evidence_warning: str | None = None
+
+
+class RoadmapStep(BaseModel):
+    timeframe: str = Field(pattern="^(7_day|30_day|90_day)$")
+    focus: str
+    actions: list[str] = Field(default_factory=list, max_length=8)
+    success_criteria: list[str] = Field(default_factory=list, max_length=6)
+
+
+class ProjectRoadmapResult(BaseModel):
+    output_type: str = "ai_project_roadmap_recommendations"
+    output_version: str = "ai-project-roadmap-v1"
+    provider: str
+    model_name: str
+    summary: str
+    projects: list[ProjectRecommendation] = Field(default_factory=list, max_length=3)
+    roadmap: list[RoadmapStep] = Field(default_factory=list, max_length=3)
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class AIProviderError(RuntimeError):
     pass
 
@@ -130,6 +159,13 @@ class AIClient:
             return _local_template_interview_prep(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._openai_compatible_interview_prep(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_project_roadmap(self, context: dict[str, Any]) -> ProjectRoadmapResult:
+        if self.provider == "local_template":
+            return _local_template_project_roadmap(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._openai_compatible_project_roadmap(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
@@ -241,6 +277,28 @@ class AIClient:
         )
         try:
             return InterviewPrepResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def _openai_compatible_project_roadmap(
+        self,
+        context: dict[str, Any],
+    ) -> ProjectRoadmapResult:
+        parsed = self._openai_compatible_json(
+            task=(
+                "Create evidence-bound project recommendations and 7-day, 30-day, and 90-day "
+                "roadmap steps. Recommend realistic future work only. Do not claim projects are "
+                "completed and do not invent skills, achievements, metrics, employers, "
+                "credentials, or experience."
+            ),
+            context=context,
+        )
+        try:
+            return ProjectRoadmapResult(
                 provider=self.provider,
                 model_name=self.model_name,
                 **parsed,
@@ -758,6 +816,163 @@ def _local_template_interview_prep(context: dict[str, Any]) -> InterviewPrepResu
             (
                 "Practice answers should be based on real evidence. Do not memorize fabricated "
                 "stories or unsupported claims."
+            )
+        ],
+    )
+
+
+def _local_template_project_roadmap(context: dict[str, Any]) -> ProjectRoadmapResult:
+    verified_skills = _string_list(context.get("verified_skills"))
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    readiness = context.get("readiness") or {}
+    generation_mode = context.get("generation_mode")
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    role_name = role or readiness.get("primary_specialization") or "the target role"
+    required = _string_list(
+        target_job.get("required_skills") if isinstance(target_job, dict) else []
+    )
+    preferred = _string_list(
+        target_job.get("preferred_skills") if isinstance(target_job, dict) else []
+    )
+    matched = _string_list(skill_gap.get("matched") if isinstance(skill_gap, dict) else [])
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    priority_skills = _interview_priority_skills(
+        verified_skills=verified_skills,
+        matched=matched,
+        required=required,
+        preferred=preferred,
+        alternate=generation_mode == "alternate",
+    )
+    practice_targets = missing[:3] or required[:3] or preferred[:3]
+    if generation_mode == "alternate":
+        project_templates = [
+            ("Evidence Portfolio Sprint", "Create visible proof around target-role requirements."),
+            (
+                "Workflow Improvement Case Study",
+                "Show structured problem solving with real context.",
+            ),
+            ("Role Simulation Pack", "Practice realistic tasks for interview and resume evidence."),
+        ]
+    else:
+        project_templates = [
+            ("Target Role Case Study", "Build a focused artifact for the target role."),
+            ("Skills Evidence Project", "Create proof for verified and missing skill areas."),
+            ("Portfolio Readiness Sprint", "Package credible examples for applications."),
+        ]
+    project_skills = priority_skills[:4] or practice_targets[:4]
+    projects = [
+        ProjectRecommendation(
+            title=title,
+            objective=(
+                f"{objective} Align it with {role_name} without claiming it is completed."
+            ),
+            skills_practiced=project_skills,
+            deliverables=[
+                "one-page project brief",
+                "work sample or documented artifact",
+                "short reflection with true scope and outcome",
+            ],
+            evidence_to_add=[
+                "project link or file",
+                "skills used",
+                "candidate-verified outcome or lesson",
+            ],
+            missing_evidence_warning=(
+                None
+                if project_skills
+                else (
+                    "No verified skills were found; define real skills before positioning a "
+                    "project."
+                )
+            ),
+        )
+        for title, objective in project_templates
+    ]
+    roadmap = [
+        RoadmapStep(
+            timeframe="7_day",
+            focus="Select one realistic project and define evidence requirements.",
+            actions=[
+                f"Choose a project tied to {role_name}.",
+                "List verified skills that can honestly be used.",
+                (
+                    f"Pick one missing skill to learn or evidence honestly: {practice_targets[0]}."
+                    if practice_targets
+                    else "Add a real skills section before selecting target keywords."
+                ),
+            ],
+            success_criteria=[
+                "project scope is documented",
+                "unsupported claims are removed",
+                "next evidence artifact is identified",
+            ],
+        ),
+        RoadmapStep(
+            timeframe="30_day",
+            focus="Build and document the first evidence artifact.",
+            actions=[
+                "Complete a small work sample or case study.",
+                "Record what was actually done, learned, and produced.",
+                "Map the artifact to resume bullets only where evidence exists.",
+            ],
+            success_criteria=[
+                "artifact is reviewable",
+                "skills are tied to real proof",
+                "resume or portfolio update is drafted",
+            ],
+        ),
+        RoadmapStep(
+            timeframe="90_day",
+            focus="Expand proof and prepare application-ready materials.",
+            actions=[
+                "Create one additional artifact for a target gap.",
+                "Update resume, portfolio, and interview examples with true evidence.",
+                "Review gaps against the target job and adjust the next project.",
+            ],
+            success_criteria=[
+                "two evidence artifacts exist",
+                "interview examples are evidence-bound",
+                "remaining gaps have a learning plan",
+            ],
+        ),
+    ]
+    warnings = [
+        (
+            f"{skill} is a target gap. Recommend practicing it, but do not list it as a skill "
+            "until real evidence exists."
+        )
+        for skill in missing[:6]
+    ]
+    if not verified_skills:
+        warnings.insert(
+            0,
+            (
+                "No verified skills were found. Add real skills and evidence before treating "
+                "project recommendations as application proof."
+            ),
+        )
+    return ProjectRoadmapResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Regenerated project roadmap uses an alternate evidence-building sequence."
+            if verified_skills and generation_mode == "alternate"
+            else (
+                "Regenerated project roadmap is limited because no verified skills were found."
+            )
+            if generation_mode == "alternate"
+            else "Project roadmap generated from verified skills and target-role gaps."
+            if verified_skills
+            else "Project roadmap is limited because no verified skills were found."
+        ),
+        projects=projects,
+        roadmap=roadmap,
+        missing_evidence_warnings=warnings[:8],
+        cautions=[
+            (
+                "Treat these as future work recommendations. Do not present a project, skill, "
+                "metric, or outcome as completed until it is true and supported by evidence."
             )
         ],
     )

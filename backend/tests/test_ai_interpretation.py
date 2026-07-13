@@ -12,11 +12,15 @@ from app.ai.llm import (
     InterviewPrepResult,
     InterviewQuestion,
     KeywordInsertionRecommendation,
+    ProjectRecommendation,
+    ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeRewriteSuggestion,
     ResumeTailoringPackageResult,
+    RoadmapStep,
 )
 from app.ai.resume_rewrite import build_resume_rewrite_context
+from app.ai.roadmap import build_project_roadmap_context
 from app.ai.tailoring import build_resume_tailoring_context
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.core.config import Settings
@@ -35,6 +39,7 @@ class FakeAIClient:
     rewrite_prompts: list[dict[str, Any]] = []
     tailoring_prompts: list[dict[str, Any]] = []
     interview_prompts: list[dict[str, Any]] = []
+    roadmap_prompts: list[dict[str, Any]] = []
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -120,6 +125,38 @@ class FakeAIClient:
                 "Add communication only if supported by real evidence."
             ],
             cautions=["Do not invent unsupported stories."],
+        )
+
+    def generate_project_roadmap(
+        self,
+        context: dict[str, Any],
+    ) -> ProjectRoadmapResult:
+        self.roadmap_prompts.append(context)
+        return ProjectRoadmapResult(
+            provider="fake",
+            model_name="fake-model",
+            summary="Project roadmap is evidence-bound.",
+            projects=[
+                ProjectRecommendation(
+                    title="Operations dashboard case study",
+                    objective="Build future proof for verified Excel and SQL skills.",
+                    skills_practiced=["excel", "sql", "operations"],
+                    deliverables=["case study", "dashboard notes"],
+                    evidence_to_add=["project link"],
+                )
+            ],
+            roadmap=[
+                RoadmapStep(
+                    timeframe="7_day",
+                    focus="Scope one realistic project.",
+                    actions=["Choose a project tied to verified skills."],
+                    success_criteria=["scope is documented"],
+                )
+            ],
+            missing_evidence_warnings=[
+                "Add communication only if supported by real evidence."
+            ],
+            cautions=["Do not present recommended projects as completed."],
         )
 
 
@@ -222,6 +259,7 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
     FakeAIClient.rewrite_prompts = []
     FakeAIClient.tailoring_prompts = []
     FakeAIClient.interview_prompts = []
+    FakeAIClient.roadmap_prompts = []
     monkeypatch.setattr(ai_route, "AIClient", FakeAIClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
@@ -468,6 +506,59 @@ def test_local_interview_prep_alternate_mode_changes_questions() -> None:
 
     assert default_result.summary != alternate_result.summary
     assert default_result.questions[0].question != alternate_result.questions[0].question
+
+
+def test_project_roadmap_context_excludes_raw_resume_sections() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_project_roadmap_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
+    assert len(context["experience_signals"]) <= 5
+    assert all(len(item) <= 220 for item in context["experience_signals"])
+    assert context["verified_skills"] == ["excel", "operations", "project management", "sql"]
+
+
+def test_local_project_roadmap_warns_about_missing_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_project_roadmap_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_project_roadmap(context)
+
+    assert "limited" in result.summary.lower()
+    assert len(result.projects) == 3
+    assert {step.timeframe for step in result.roadmap} == {"7_day", "30_day", "90_day"}
+    assert "no verified skills" in result.missing_evidence_warnings[0].lower()
+    assert "future work" in result.cautions[0].lower()
+
+
+def test_local_project_roadmap_alternate_mode_changes_summary() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_project_roadmap_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_project_roadmap(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_project_roadmap(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.projects[0].title != alternate_result.projects[0].title
 
 
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:
@@ -892,3 +983,111 @@ def test_interview_prep_force_regenerate_bypasses_cached_output(monkeypatch) -> 
     assert response.json()["summary"] == "Interview prep is evidence-bound."
     assert fake.outputs
     assert FakeAIClient.interview_prompts[0]["generation_mode"] == "alternate"
+
+
+def test_project_roadmap_endpoint_generates_and_persists(monkeypatch) -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/project-roadmap-recommendations",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["provider"] == "fake"
+    assert body["projects"][0]["title"] == "Operations dashboard case study"
+    assert fake.outputs[0]["output_type"] == "ai_project_roadmap_recommendations"
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.roadmap_prompts[0])
+
+
+def test_project_roadmap_endpoint_returns_cached_output(monkeypatch) -> None:
+    cached_result = ProjectRoadmapResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached project roadmap.",
+        projects=[],
+        roadmap=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/project-roadmap-recommendations",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is True
+    assert response.json()["summary"] == "Cached project roadmap."
+    assert fake.outputs == []
+    assert FakeAIClient.roadmap_prompts == []
+
+
+def test_project_roadmap_force_regenerate_bypasses_cached_output(monkeypatch) -> None:
+    cached_result = ProjectRoadmapResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached project roadmap.",
+        projects=[],
+        roadmap=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/project-roadmap-recommendations",
+        json={"job_description_id": TEST_JOB_ID, "force_regenerate": True},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is False
+    assert response.json()["summary"] == "Project roadmap is evidence-bound."
+    assert fake.outputs
+    assert FakeAIClient.roadmap_prompts[0]["generation_mode"] == "alternate"

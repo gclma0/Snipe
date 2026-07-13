@@ -9,6 +9,8 @@ import {
   CareerTransitionResult,
   ClaimVerificationResult,
   InterviewPrepResult,
+  LearningPlanResult,
+  LearningPlanStep,
   MockInterviewSession,
   OutreachMessagePack,
   ProjectRoadmapResult,
@@ -28,6 +30,7 @@ type AIResultsPanelProps = {
   outreachResult: OutreachMessagePack | null;
   careerTransitionResult: CareerTransitionResult | null;
   projectRoadmapResult: ProjectRoadmapResult | null;
+  learningPlanResult: LearningPlanResult | null;
   applicationMaterialsResult: ApplicationMaterialsResult | null;
   isBusy: boolean;
   onMockInterviewAnswerChange: (value: string) => void;
@@ -46,6 +49,7 @@ export function AIResultsPanel({
   outreachResult,
   careerTransitionResult,
   projectRoadmapResult,
+  learningPlanResult,
   applicationMaterialsResult,
   isBusy,
   onMockInterviewAnswerChange,
@@ -385,6 +389,30 @@ export function AIResultsPanel({
           ) : null}
         </div>
       ) : null}
+      {learningPlanResult ? (
+        <div className="mt-5 border-t border-border pt-5 text-sm">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-base font-semibold">Learning plan</h3>
+            <p className="text-xs text-muted-foreground">{learningPlanResult.cached ? "Cached" : learningPlanResult.provider}</p>
+          </div>
+          <p className="mt-2 text-muted-foreground">{learningPlanResult.summary}</p>
+          <LearningPlanSection title="Daily plan" steps={learningPlanResult.daily_plan} />
+          <LearningPlanSection title="Weekly plan" steps={learningPlanResult.weekly_plan} />
+          <LearningPlanSection title="Monthly plan" steps={learningPlanResult.monthly_plan} />
+          {learningPlanResult.missing_evidence_warnings.length ? (
+            <dl className="mt-4 grid gap-3">
+              <JobField label="Missing evidence" values={learningPlanResult.missing_evidence_warnings.slice(0, 6)} />
+            </dl>
+          ) : null}
+          {learningPlanResult.cautions.length ? (
+            <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+              {learningPlanResult.cautions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       {applicationMaterialsResult ? (
         <div className="mt-5 border-t border-border pt-5 text-sm">
           <div className="flex items-baseline gap-3">
@@ -414,5 +442,28 @@ export function AIResultsPanel({
         </div>
       ) : null}
     </>
+  );
+}
+
+function LearningPlanSection({ title, steps }: { title: string; steps: LearningPlanStep[] }) {
+  if (!steps.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 grid gap-3">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {steps.map((item) => (
+        <div key={`${item.cadence}-${item.title}`} className="border border-border p-3">
+          <p className="font-medium">{item.title}</p>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <JobField label="Tasks" values={item.tasks} />
+            <JobField label="Success criteria" values={item.success_criteria} />
+            <JobField label="Practice" values={[item.practice_activity]} />
+            <JobField label="Evidence to create" values={[item.evidence_to_create]} />
+          </dl>
+        </div>
+      ))}
+    </div>
   );
 }

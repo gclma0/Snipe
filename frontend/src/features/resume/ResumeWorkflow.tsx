@@ -39,6 +39,7 @@ import {
   JobMatch,
   JobMatchResult,
   SavedJobMatchRun,
+  LearningPlanResult,
   LinkedInSourceResult,
   MockInterviewSession,
   OutreachMessagePack,
@@ -66,6 +67,7 @@ import {
   createClaimVerificationQuestions,
   createFullReport,
   createInterviewPrep,
+  createLearningPlan,
   createOutreachMessagePack,
   createJobDescription,
   createProjectRoadmap,
@@ -133,6 +135,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [outreachResult, setOutreachResult] = useState<OutreachMessagePack | null>(null);
   const [careerTransitionResult, setCareerTransitionResult] = useState<CareerTransitionResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
+  const [learningPlanResult, setLearningPlanResult] = useState<LearningPlanResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentSummary[]>([]);
@@ -237,6 +240,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -293,6 +297,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs(outputs);
       setGeneratedOutputFilter("all");
@@ -332,6 +337,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -362,6 +368,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setOutreachResult(null);
     setCareerTransitionResult(null);
     setProjectRoadmapResult(null);
+    setLearningPlanResult(null);
     setApplicationMaterialsResult(null);
     setSelectedGeneratedOutput(null);
     setMessage(selected ? "Saved target job selected." : "Target job selection cleared.");
@@ -397,6 +404,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setSelectedGeneratedOutput(null);
       return existingTarget;
@@ -431,6 +439,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setOutreachResult(null);
     setCareerTransitionResult(null);
     setProjectRoadmapResult(null);
+    setLearningPlanResult(null);
     setApplicationMaterialsResult(null);
     setSelectedGeneratedOutput(null);
     return result;
@@ -604,6 +613,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -653,6 +663,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setOutreachResult(null);
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -1136,6 +1147,32 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleCreateLearningPlan(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating learning plan..." : "Generating learning plan...");
+    setMessage(null);
+    try {
+      const result = await createLearningPlan(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setLearningPlanResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(result.cached ? "Learning plan loaded from cache." : "Learning plan generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate learning plan.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
   async function handleRunDashboard() {
     if (!accessToken || !profile) {
       return;
@@ -1487,6 +1524,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onCreateClaimVerification={handleCreateClaimVerification}
             onCreateFullReport={handleCreateFullReport}
             onCreateInterviewPrep={handleCreateInterviewPrep}
+            onCreateLearningPlan={handleCreateLearningPlan}
             onCreateOutreachPack={handleCreateOutreachPack}
             onCreateProjectRoadmap={handleCreateProjectRoadmap}
             onCreateReport={handleCreateReport}
@@ -1597,6 +1635,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             claimVerificationResult={claimVerificationResult}
             interviewResult={interviewResult}
             isBusy={isBusy}
+            learningPlanResult={learningPlanResult}
             mockInterviewAnswer={mockInterviewAnswer}
             mockInterviewEvaluation={mockInterviewEvaluation}
             mockInterviewSession={mockInterviewSession}

@@ -8,24 +8,18 @@
 
 ## Current Implementation Status
 
-Current build status: Milestone 20 is the active milestone.
+Current build status: Milestone 20 is implemented at usable depth, with Milestones 21-23 partially implemented ahead of strict sequence.
 
 - Milestones 1-14 are implemented at usable depth.
 - Milestones 15-18 are partially implemented through evidence-bound AI outputs, generated-output caching, and saved-output history.
 - Milestone 19 is implemented with RAG ingestion, retrieval, source filters, and reference-library management.
-- Milestone 20 is implemented for deterministic RAG-backed job matching, with saved job-match history as the remaining gap.
-- Milestones 21-23 have been started ahead of strict sequence through interview prep, claim questions, mock interview, answer evaluation, outreach, and career-transition outputs.
+- Milestone 20 is implemented for deterministic RAG-backed job matching and saved job-match history.
+- Milestones 21-23 have been started ahead of strict sequence through interview prep, claim questions, mock interview, answer evaluation, outreach, career-transition outputs, and learning-plan generation.
 - Milestone 24 is partially implemented through full reports and baseline privacy controls.
-
-Known remaining gaps before Milestone 20 can be considered complete:
-
-- Persist and reopen saved job-match runs.
-- Keep API documentation aligned with the implemented routes.
 
 Known later-phase gaps:
 
 - Dedicated LinkedIn optimization outputs.
-- Standalone daily, weekly, and monthly learning-plan generation.
 - Frontend support for uploaded target job-description documents.
 - Exportable user data, audit-friendly privacy events, and optional delete-after-parsing controls.
 

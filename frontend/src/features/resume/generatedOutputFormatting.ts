@@ -11,6 +11,7 @@ export function formatOutputType(outputType: string) {
     ai_resume_tailoring_package: "Tailoring package",
     mvp_basic_report: "Basic report",
     ai_project_roadmap_recommendations: "Project roadmap",
+    ai_learning_plan: "Learning plan",
     ai_application_materials: "Application materials",
     full_career_report: "Full report",
   };

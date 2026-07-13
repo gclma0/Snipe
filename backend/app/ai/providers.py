@@ -8,6 +8,7 @@ from app.ai.schemas import (
     AIInterpretationResult,
     ApplicationMaterialsResult,
     InterviewPrepResult,
+    LearningPlanResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
@@ -107,6 +108,25 @@ class OpenAICompatibleProvider:
         )
         try:
             return ProjectRoadmapResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def generate_learning_plan(self, context: dict[str, Any]) -> LearningPlanResult:
+        parsed = self._request_json(
+            task=(
+                "Create evidence-bound daily, weekly, and monthly learning plans. Each item "
+                "must include tasks, practice activity, evidence to create, and success "
+                "criteria. Do not invent skills, achievements, metrics, employers, "
+                "credentials, or experience."
+            ),
+            context=context,
+        )
+        try:
+            return LearningPlanResult(
                 provider=self.provider,
                 model_name=self.model_name,
                 **parsed,

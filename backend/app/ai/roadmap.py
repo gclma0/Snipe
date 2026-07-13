@@ -6,6 +6,7 @@ from typing import Any
 from app.scoring.readiness import ReadinessDashboardResult
 
 ROADMAP_CONTEXT_VERSION = "ai-project-roadmap-context-v1"
+LEARNING_PLAN_CONTEXT_VERSION = "ai-learning-plan-context-v1"
 
 
 def build_project_roadmap_context(
@@ -42,6 +43,32 @@ def build_project_roadmap_context(
 
 
 def project_roadmap_context_hash(context: dict[str, Any]) -> str:
+    encoded = json.dumps(context, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
+def build_learning_plan_context(
+    *,
+    normalized_profile: dict[str, Any],
+    readiness: ReadinessDashboardResult,
+    structured_job: dict[str, Any] | None,
+) -> dict[str, Any]:
+    context = build_project_roadmap_context(
+        normalized_profile=normalized_profile,
+        readiness=readiness,
+        structured_job=structured_job,
+    )
+    context["context_version"] = LEARNING_PLAN_CONTEXT_VERSION
+    context["constraints"] = [
+        "Create daily, weekly, and monthly learning tasks from compact profile facts.",
+        "Use verified skills and target gaps; do not claim unfinished learning as experience.",
+        "Every activity should create evidence the candidate can honestly add later.",
+        "Do not invent achievements, metrics, skills, employers, credentials, or experience.",
+    ]
+    return context
+
+
+def learning_plan_context_hash(context: dict[str, Any]) -> str:
     encoded = json.dumps(context, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return sha256(encoded).hexdigest()
 

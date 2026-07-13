@@ -119,6 +119,29 @@ class ProjectRoadmapResult(BaseModel):
     cached: bool = False
 
 
+class LearningPlanStep(BaseModel):
+    cadence: str = Field(pattern="^(daily|weekly|monthly)$")
+    title: str
+    tasks: list[str] = Field(default_factory=list, max_length=10)
+    practice_activity: str
+    evidence_to_create: str
+    success_criteria: list[str] = Field(default_factory=list, max_length=6)
+
+
+class LearningPlanResult(BaseModel):
+    output_type: str = "ai_learning_plan"
+    output_version: str = "ai-learning-plan-v1"
+    provider: str
+    model_name: str
+    summary: str
+    daily_plan: list[LearningPlanStep] = Field(default_factory=list, max_length=7)
+    weekly_plan: list[LearningPlanStep] = Field(default_factory=list, max_length=4)
+    monthly_plan: list[LearningPlanStep] = Field(default_factory=list, max_length=6)
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class ApplicationMaterialsResult(BaseModel):
     output_type: str = "ai_application_materials"
     output_version: str = "ai-application-materials-v1"

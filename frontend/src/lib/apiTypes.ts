@@ -358,6 +358,29 @@ export type ProjectRoadmapResult = {
   cached: boolean;
 };
 
+export type LearningPlanStep = {
+  cadence: "daily" | "weekly" | "monthly";
+  title: string;
+  tasks: string[];
+  practice_activity: string;
+  evidence_to_create: string;
+  success_criteria: string[];
+};
+
+export type LearningPlanResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  daily_plan: LearningPlanStep[];
+  weekly_plan: LearningPlanStep[];
+  monthly_plan: LearningPlanStep[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ApplicationMaterialsResult = {
   output_type: string;
   output_version: string;

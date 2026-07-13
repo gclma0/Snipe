@@ -14,6 +14,8 @@ from app.ai.llm import (
     InterviewPrepResult,
     InterviewQuestion,
     KeywordInsertionRecommendation,
+    LearningPlanResult,
+    LearningPlanStep,
     ProjectRecommendation,
     ProjectRoadmapResult,
     ResumeRewriteResult,
@@ -22,7 +24,7 @@ from app.ai.llm import (
     RoadmapStep,
 )
 from app.ai.resume_rewrite import build_resume_rewrite_context
-from app.ai.roadmap import build_project_roadmap_context
+from app.ai.roadmap import build_learning_plan_context, build_project_roadmap_context
 from app.ai.tailoring import build_resume_tailoring_context
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.core.config import Settings
@@ -42,6 +44,7 @@ class FakeAIClient:
     tailoring_prompts: list[dict[str, Any]] = []
     interview_prompts: list[dict[str, Any]] = []
     roadmap_prompts: list[dict[str, Any]] = []
+    learning_plan_prompts: list[dict[str, Any]] = []
     application_prompts: list[dict[str, Any]] = []
 
     def __init__(self, settings: Settings) -> None:
@@ -160,6 +163,51 @@ class FakeAIClient:
                 "Add communication only if supported by real evidence."
             ],
             cautions=["Do not present recommended projects as completed."],
+        )
+
+    def generate_learning_plan(
+        self,
+        context: dict[str, Any],
+    ) -> LearningPlanResult:
+        self.learning_plan_prompts.append(context)
+        return LearningPlanResult(
+            provider="fake",
+            model_name="fake-model",
+            summary="Learning plan is evidence-bound.",
+            daily_plan=[
+                LearningPlanStep(
+                    cadence="daily",
+                    title="Daily SQL practice",
+                    tasks=["Practice SQL with one real dataset."],
+                    practice_activity="Complete a small SQL query exercise.",
+                    evidence_to_create="Saved SQL notes.",
+                    success_criteria=["query result is reviewed"],
+                )
+            ],
+            weekly_plan=[
+                LearningPlanStep(
+                    cadence="weekly",
+                    title="Weekly dashboard proof",
+                    tasks=["Create a small dashboard outline."],
+                    practice_activity="Document an operations reporting workflow.",
+                    evidence_to_create="Dashboard case-study outline.",
+                    success_criteria=["outline maps to real work"],
+                )
+            ],
+            monthly_plan=[
+                LearningPlanStep(
+                    cadence="monthly",
+                    title="Monthly portfolio artifact",
+                    tasks=["Package the best practice artifact."],
+                    practice_activity="Create one reviewable learning artifact.",
+                    evidence_to_create="Portfolio-ready learning artifact.",
+                    success_criteria=["artifact is truthful and reviewable"],
+                )
+            ],
+            missing_evidence_warnings=[
+                "Add communication only if supported by real evidence."
+            ],
+            cautions=["Do not present planned learning as completed."],
         )
 
     def generate_application_materials(
@@ -282,6 +330,7 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
     FakeAIClient.tailoring_prompts = []
     FakeAIClient.interview_prompts = []
     FakeAIClient.roadmap_prompts = []
+    FakeAIClient.learning_plan_prompts = []
     FakeAIClient.application_prompts = []
     monkeypatch.setattr(ai_route, "AIClient", FakeAIClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
@@ -582,6 +631,41 @@ def test_local_project_roadmap_alternate_mode_changes_summary() -> None:
 
     assert default_result.summary != alternate_result.summary
     assert default_result.projects[0].title != alternate_result.projects[0].title
+
+
+def test_learning_plan_context_excludes_raw_resume_sections() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_learning_plan_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
+    assert len(context["experience_signals"]) <= 5
+    assert context["context_version"] == "ai-learning-plan-context-v1"
+    assert context["verified_skills"] == ["excel", "operations", "project management", "sql"]
+
+
+def test_local_learning_plan_warns_about_missing_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_learning_plan_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_learning_plan(context)
+
+    assert "limited" in result.summary.lower()
+    assert len(result.daily_plan) == 7
+    assert len(result.weekly_plan) >= 1
+    assert len(result.monthly_plan) >= 1
+    assert result.daily_plan[0].cadence == "daily"
+    assert "no verified skills" in result.missing_evidence_warnings[0].lower()
+    assert "planned learning" in result.cautions[0].lower()
 
 
 def test_application_materials_context_excludes_raw_resume_sections() -> None:
@@ -1088,6 +1172,36 @@ def test_project_roadmap_endpoint_generates_and_persists(monkeypatch) -> None:
     assert body["projects"][0]["title"] == "Operations dashboard case study"
     assert fake.outputs[0]["output_type"] == "ai_project_roadmap_recommendations"
     assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.roadmap_prompts[0])
+
+
+def test_learning_plan_endpoint_generates_and_persists(monkeypatch) -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/learning-plan",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["provider"] == "fake"
+    assert body["daily_plan"][0]["title"] == "Daily SQL practice"
+    assert fake.outputs[0]["output_type"] == "ai_learning_plan"
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.learning_plan_prompts[0])
 
 
 def test_project_roadmap_endpoint_returns_cached_output(monkeypatch) -> None:

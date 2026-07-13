@@ -5,6 +5,7 @@ from app.ai.schemas import (
     AIInterpretationResult,
     ApplicationMaterialsResult,
     InterviewPrepResult,
+    LearningPlanResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
@@ -194,6 +195,40 @@ def project_roadmap_markdown(result: ProjectRoadmapResult) -> str:
                     "",
                     "Actions:",
                     *[f"- {action}" for action in item.actions],
+                    "Success criteria:",
+                    *[f"- {criterion}" for criterion in item.success_criteria],
+                    "",
+                ]
+            )
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence Warnings")
+        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def learning_plan_markdown(result: LearningPlanResult) -> str:
+    lines = ["# Snipe Learning Plan", "", result.summary, ""]
+    sections = [
+        ("Daily Plan", result.daily_plan),
+        ("Weekly Plan", result.weekly_plan),
+        ("Monthly Plan", result.monthly_plan),
+    ]
+    for title, steps in sections:
+        if not steps:
+            continue
+        lines.append(f"## {title}")
+        for item in steps:
+            lines.extend(
+                [
+                    f"### {item.title}",
+                    "Tasks:",
+                    *[f"- {task}" for task in item.tasks],
+                    f"Practice: {item.practice_activity}",
+                    f"Evidence to create: {item.evidence_to_create}",
                     "Success criteria:",
                     *[f"- {criterion}" for criterion in item.success_criteria],
                     "",

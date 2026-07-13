@@ -8,6 +8,8 @@ from app.ai.schemas import (
     InterviewPrepResult,
     InterviewQuestion,
     KeywordInsertionRecommendation,
+    LearningPlanResult,
+    LearningPlanStep,
     ProjectRecommendation,
     ProjectRoadmapResult,
     ResumeRewriteResult,
@@ -60,6 +62,13 @@ class AIClient:
             return _local_template_project_roadmap(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._provider().generate_project_roadmap(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_learning_plan(self, context: dict[str, Any]) -> LearningPlanResult:
+        if self.provider == "local_template":
+            return _local_template_learning_plan(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._provider().generate_learning_plan(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_application_materials(
@@ -784,6 +793,101 @@ def _local_template_project_roadmap(context: dict[str, Any]) -> ProjectRoadmapRe
             (
                 "Treat these as future work recommendations. Do not present a project, skill, "
                 "metric, or outcome as completed until it is true and supported by evidence."
+            )
+        ],
+    )
+
+
+def _local_template_learning_plan(context: dict[str, Any]) -> LearningPlanResult:
+    verified_skills = _string_list(context.get("verified_skills"))
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    readiness = context.get("readiness") or {}
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    role_name = role or readiness.get("primary_specialization") or "the target role"
+    required = _string_list(
+        target_job.get("required_skills") if isinstance(target_job, dict) else []
+    )
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    focus_skills = missing[:4] or required[:4] or verified_skills[:4] or ["role-specific evidence"]
+
+    def step(cadence: str, index: int, skill: str) -> LearningPlanStep:
+        return LearningPlanStep(
+            cadence=cadence,
+            title=f"{cadence.title()} focus {index}: {skill}",
+            tasks=[
+                f"Study one practical concept related to {skill}.",
+                f"Practice a small task tied to {role_name}.",
+                "Record what was actually practiced and what remains unclear.",
+            ],
+            practice_activity=f"Complete a small evidence-building exercise for {skill}.",
+            evidence_to_create=(
+                f"A short note, artifact, or work sample showing real practice with {skill}."
+            ),
+            success_criteria=[
+                "task is completed honestly",
+                "evidence artifact is saved",
+                "unsupported claims are not added to the resume",
+            ],
+        )
+
+    daily_plan = [
+        step("daily", index + 1, skill)
+        for index, skill in enumerate((focus_skills * 2)[:7])
+    ]
+    weekly_plan = [
+        step("weekly", index + 1, skill)
+        for index, skill in enumerate(focus_skills[:4])
+    ]
+    monthly_plan = [
+        LearningPlanStep(
+            cadence="monthly",
+            title=f"Month {index + 1}: Build proof for {skill}",
+            tasks=[
+                f"Complete one larger practice artifact connected to {skill}.",
+                "Review target-job requirements and update the next practice scope.",
+                "Convert only verified work into portfolio, resume, or interview evidence.",
+            ],
+            practice_activity=f"Create a reviewable {role_name} practice artifact.",
+            evidence_to_create=(
+                "A portfolio-ready artifact with truthful scope and lessons learned."
+            ),
+            success_criteria=[
+                "artifact is reviewable",
+                "skills are mapped to real proof",
+                "next gap is selected",
+            ],
+        )
+        for index, skill in enumerate((focus_skills * 2)[:6])
+    ]
+    warnings = [
+        (
+            f"{skill} is a target gap. Learn and practice it before listing it as a "
+            "verified skill."
+        )
+        for skill in missing[:6]
+    ]
+    if not verified_skills:
+        warnings.insert(
+            0,
+            "No verified skills were found. Treat this plan as preparation, not resume proof.",
+        )
+    return LearningPlanResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Learning plan generated from verified skills and target-role gaps."
+            if verified_skills
+            else "Learning plan is limited because no verified skills were found."
+        ),
+        daily_plan=daily_plan,
+        weekly_plan=weekly_plan,
+        monthly_plan=monthly_plan,
+        missing_evidence_warnings=warnings[:8],
+        cautions=[
+            (
+                "Use this as a future learning schedule. Do not present planned learning as "
+                "completed experience until evidence exists."
             )
         ],
     )

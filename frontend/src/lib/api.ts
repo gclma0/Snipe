@@ -34,6 +34,8 @@ export type {
   ProjectRecommendation,
   RoadmapStep,
   ProjectRoadmapResult,
+  LearningPlanStep,
+  LearningPlanResult,
   ApplicationMaterialsResult,
   JobMatch,
   JobMatchResult,
@@ -73,6 +75,7 @@ import type {
   OutreachMessagePack,
   CareerTransitionResult,
   ProjectRoadmapResult,
+  LearningPlanResult,
   ApplicationMaterialsResult,
   JobMatchResult,
   SavedJobMatchRun,
@@ -425,6 +428,28 @@ export function createProjectRoadmap(
 ) {
   return request<ProjectRoadmapResult>(
     `/profiles/${profileId}/ai/project-roadmap-recommendations`,
+    token,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        job_description_id: jobDescriptionId ?? null,
+        force_regenerate: forceRegenerate,
+      }),
+    },
+  );
+}
+
+export function createLearningPlan(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<LearningPlanResult>(
+    `/profiles/${profileId}/ai/learning-plan`,
     token,
     {
       method: "POST",

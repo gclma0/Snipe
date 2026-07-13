@@ -22,6 +22,7 @@ type ResumeUploadSummaryProps = {
   onCreateOutreachPack: () => void;
   onCreateCareerTransition: () => void;
   onCreateProjectRoadmap: (forceRegenerate?: boolean) => void;
+  onCreateLearningPlan: (forceRegenerate?: boolean) => void;
   onCreateApplicationMaterials: (forceRegenerate?: boolean) => void;
 };
 
@@ -46,6 +47,7 @@ export function ResumeUploadSummary({
   onCreateOutreachPack,
   onCreateCareerTransition,
   onCreateProjectRoadmap,
+  onCreateLearningPlan,
   onCreateApplicationMaterials,
 }: ResumeUploadSummaryProps) {
   if (!uploadResult) {
@@ -95,6 +97,7 @@ export function ResumeUploadSummary({
         onCreateInterviewPrep={onCreateInterviewPrep}
         onCreateOutreachPack={onCreateOutreachPack}
         onCreateProjectRoadmap={onCreateProjectRoadmap}
+        onCreateLearningPlan={onCreateLearningPlan}
         onCreateReport={onCreateReport}
         onCreateRewriteSuggestions={onCreateRewriteSuggestions}
         onCreateTailoringPackage={onCreateTailoringPackage}

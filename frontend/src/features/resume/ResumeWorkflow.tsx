@@ -6,6 +6,7 @@ import {
   Gauge,
   Github,
   GitCompareArrows,
+  History,
   LayoutDashboard,
   Linkedin,
   LinkIcon,
@@ -24,6 +25,7 @@ import {
   AIInterpretationResult,
   CandidateProfile,
   DeterministicScoreResult,
+  GeneratedOutput,
   GitHubSourceResult,
   InterviewPrepResult,
   JobDescriptionResult,
@@ -46,6 +48,7 @@ import {
   createResumeTailoringPackage,
   createProfile,
   deleteProfileData,
+  listGeneratedOutputs,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
   runReadinessDashboard,
@@ -103,6 +106,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
+  const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -163,6 +167,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setGeneratedOutputs([]);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -188,6 +193,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setGeneratedOutputs([]);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -294,6 +300,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setGeneratedOutputs([]);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -328,6 +335,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setRewriteResult(null);
       setTailoringResult(null);
       setInterviewResult(null);
+      setGeneratedOutputs([]);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -349,6 +357,24 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Basic report generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate report.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleLoadGeneratedOutputs() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await listGeneratedOutputs(accessToken, profile.id);
+      setGeneratedOutputs(result);
+      setMessage(result.length ? "Saved outputs loaded." : "No saved outputs found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load saved outputs.");
     } finally {
       setIsBusy(false);
     }
@@ -685,6 +711,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Generate basic report
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleLoadGeneratedOutputs}>
+                <History aria-hidden="true" className="h-4 w-4" />
+                Load saved outputs
+              </button>
               <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(false)}>
                 <Sparkles aria-hidden="true" className="h-4 w-4" />
                 Generate AI interpretation
@@ -821,6 +851,36 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
                 {reportResult.markdown}
               </pre>
+            </div>
+          ) : null}
+          {generatedOutputs.length ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Saved outputs</h3>
+                <p className="text-xs text-muted-foreground">{generatedOutputs.length}</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {generatedOutputs.map((item) => (
+                  <div key={item.id} className="border border-border p-3">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                      <p className="font-medium">{formatOutputType(item.output_type)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatOutputDate(item.created_at)}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">{generatedOutputSummary(item)}</p>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
+                      <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
+                    </dl>
+                    {item.result_markdown ? (
+                      <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
+                        {item.result_markdown}
+                      </pre>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {aiInterpretationResult ? (
@@ -989,6 +1049,40 @@ function JobField({ label, values }: { label: string; values: string[] }) {
       <dd className="mt-1 text-muted-foreground">{values.length ? values.join(", ") : "Not found"}</dd>
     </div>
   );
+}
+
+function formatOutputType(outputType: string) {
+  const labels: Record<string, string> = {
+    ai_interview_prep: "Interview prep",
+    ai_readiness_interpretation: "AI interpretation",
+    ai_resume_rewrite_suggestions: "Rewrite suggestions",
+    ai_resume_tailoring_package: "Tailoring package",
+    mvp_basic_report: "Basic report",
+  };
+  return labels[outputType] ?? outputType.replace(/_/g, " ");
+}
+
+function generatedOutputSummary(output: GeneratedOutput) {
+  const summary = output.result_json.summary;
+  if (typeof summary === "string" && summary.trim()) {
+    return summary;
+  }
+  const title = output.result_json.title;
+  if (typeof title === "string" && title.trim()) {
+    return title;
+  }
+  return "Saved generated output.";
+}
+
+function formatOutputDate(value: string | null) {
+  if (!value) {
+    return "Date unavailable";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
 }
 
 function ScoreCard({ title, result }: { title: string; result: DeterministicScoreResult }) {

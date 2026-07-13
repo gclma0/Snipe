@@ -207,6 +207,19 @@ export type InterviewPrepResult = {
   cached: boolean;
 };
 
+export type GeneratedOutput = {
+  id: string;
+  output_type: string;
+  job_description_id: string | null;
+  prompt_version: string | null;
+  provider: string | null;
+  model_name: string | null;
+  result_json: Record<string, unknown>;
+  result_markdown: string | null;
+  status: string;
+  created_at: string | null;
+};
+
 export type ProfileDeletionResult = {
   profile_id: string;
   deleted: boolean;
@@ -431,6 +444,13 @@ export function createInterviewPrep(
       force_regenerate: forceRegenerate,
     }),
   });
+}
+
+export function listGeneratedOutputs(token: string, profileId: string, limit = 20) {
+  return request<GeneratedOutput[]>(
+    `/profiles/${profileId}/generated-outputs?limit=${encodeURIComponent(String(limit))}`,
+    token,
+  );
 }
 
 export function deleteProfileData(token: string, profileId: string) {

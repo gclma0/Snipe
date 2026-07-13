@@ -3,6 +3,7 @@ import { ResumeUploadResult } from "@/lib/api";
 
 type ResumeUploadSummaryProps = {
   uploadResult: ResumeUploadResult | null;
+  activeTargetLabel: string | null;
   isBusy: boolean;
   isSavedOutputsLoading: boolean;
   onRunAnalysis: () => void;
@@ -26,6 +27,7 @@ type ResumeUploadSummaryProps = {
 
 export function ResumeUploadSummary({
   uploadResult,
+  activeTargetLabel,
   isBusy,
   isSavedOutputsLoading,
   onRunAnalysis,
@@ -75,6 +77,12 @@ export function ResumeUploadSummary({
       <div>
         <dt className="font-medium">Profile version</dt>
         <dd className="text-muted-foreground">{uploadResult.profile_version ?? "Pending"}</dd>
+      </div>
+      <div className="sm:col-span-2">
+        <dt className="font-medium">Active target</dt>
+        <dd className="text-muted-foreground">
+          {activeTargetLabel ?? "No target job selected. Target-aware outputs will use general profile context."}
+        </dd>
       </div>
       <ResumeActionsPanel
         isBusy={isBusy}

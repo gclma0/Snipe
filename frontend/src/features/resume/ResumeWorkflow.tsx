@@ -35,6 +35,7 @@ import {
   GitHubSourceResult,
   InterviewPrepResult,
   JobDescriptionResult,
+  JobMatch,
   JobMatchResult,
   LinkedInSourceResult,
   MockInterviewSession,
@@ -71,6 +72,7 @@ import {
   getPrivacyDataSummary,
   getGeneratedOutput,
   listGeneratedOutputs,
+  listJobDescriptions,
   listProfiles,
   runAtsReadinessAnalysis,
   runJobMatches,
@@ -94,6 +96,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
   const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
+  const [jobOptions, setJobOptions] = useState<JobDescriptionResult[]>([]);
   const [githubResult, setGithubResult] = useState<GitHubSourceResult | null>(null);
   const [portfolioResult, setPortfolioResult] = useState<PortfolioSourceResult | null>(null);
   const [linkedInResult, setLinkedInResult] = useState<LinkedInSourceResult | null>(null);
@@ -124,6 +127,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [isSavedOutputsLoading, setIsSavedOutputsLoading] = useState(false);
   const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
+  const [jobMatchQuery, setJobMatchQuery] = useState("");
+  const [jobMatchLimit, setJobMatchLimit] = useState(10);
   const filteredGeneratedOutputs =
     generatedOutputFilter === "all"
       ? generatedOutputs
@@ -176,6 +181,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setJobOptions([]);
       setGithubResult(null);
       setPortfolioResult(null);
       setLinkedInResult(null);
@@ -224,12 +230,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       }
 
       const outputs = await listGeneratedOutputs(accessToken, latestProfile.id);
+      const jobs = await listJobDescriptions(accessToken, latestProfile.id);
       setProfile(latestProfile);
       setUploadResult(null);
       setQualityResult(null);
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setJobOptions(jobs);
       setGithubResult(null);
       setPortfolioResult(null);
       setLinkedInResult(null);
@@ -272,6 +280,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await createJobDescription(accessToken, profile.id, values.text);
       setJobResult(result);
+      setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
       setSkillGapResult(null);
       setJobMatchResult(null);
       setDashboardResult(null);
@@ -297,6 +306,122 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  function handleSelectJobDescription(jobId: string) {
+    const selected = jobOptions.find((job) => job.id === jobId) ?? null;
+    setJobResult(selected);
+    setSkillGapResult(null);
+    setDashboardResult(null);
+    setReportResult(null);
+    setFullReportResult(null);
+    setAiInterpretationResult(null);
+    setRewriteResult(null);
+    setTailoringResult(null);
+    setInterviewResult(null);
+    setClaimVerificationResult(null);
+    setMockInterviewSession(null);
+    setMockInterviewEvaluation(null);
+    setMockInterviewAnswer("");
+    setOutreachResult(null);
+    setCareerTransitionResult(null);
+    setProjectRoadmapResult(null);
+    setApplicationMaterialsResult(null);
+    setSelectedGeneratedOutput(null);
+    setMessage(selected ? "Saved target job selected." : "Target job selection cleared.");
+  }
+
+  async function saveJobMatchAsTarget(match: JobMatch) {
+    if (!accessToken || !profile) {
+      return null;
+    }
+
+    if (match.source_excerpt.trim().length < 100) {
+      setMessage("This job match does not include enough source text to save as a target job.");
+      return null;
+    }
+
+    const result = await createJobDescription(accessToken, profile.id, match.source_excerpt);
+    setJobResult(result);
+    setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
+    setSkillGapResult(null);
+    setDashboardResult(null);
+    setReportResult(null);
+    setFullReportResult(null);
+    setAiInterpretationResult(null);
+    setRewriteResult(null);
+    setTailoringResult(null);
+    setInterviewResult(null);
+    setClaimVerificationResult(null);
+    setMockInterviewSession(null);
+    setMockInterviewEvaluation(null);
+    setMockInterviewAnswer("");
+    setOutreachResult(null);
+    setCareerTransitionResult(null);
+    setProjectRoadmapResult(null);
+    setApplicationMaterialsResult(null);
+    setSelectedGeneratedOutput(null);
+    return result;
+  }
+
+  async function handleSaveJobMatchAsTarget(match: JobMatch) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await saveJobMatchAsTarget(match);
+      if (result) {
+        setMessage("Job match saved as the active target job.");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save job match as target.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleSaveJobMatchAndGenerate(
+    match: JobMatch,
+    outputType: "tailoring" | "interview" | "materials",
+  ) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    const labels = {
+      tailoring: "tailoring package",
+      interview: "interview prep",
+      materials: "application materials",
+    };
+    setIsBusy(true);
+    setBusyLabel(`Saving match and generating ${labels[outputType]}...`);
+    setMessage(null);
+    try {
+      const targetJob = await saveJobMatchAsTarget(match);
+      if (!targetJob?.id) {
+        return;
+      }
+      if (outputType === "tailoring") {
+        const result = await createResumeTailoringPackage(accessToken, profile.id, targetJob.id, false);
+        setTailoringResult(result);
+      } else if (outputType === "interview") {
+        const result = await createInterviewPrep(accessToken, profile.id, targetJob.id, false);
+        setInterviewResult(result);
+      } else {
+        const result = await createApplicationMaterials(accessToken, profile.id, targetJob.id, false);
+        setApplicationMaterialsResult(result);
+      }
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(`Job match saved and ${labels[outputType]} generated.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `Could not generate ${labels[outputType]}.`);
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
     }
   }
 
@@ -436,6 +561,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAtsResult(null);
       setCompletenessResult(null);
       setJobResult(null);
+      setJobOptions([]);
       setGithubResult(null);
       setPortfolioResult(null);
       setLinkedInResult(null);
@@ -966,7 +1092,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setBusyLabel("Retrieving and ranking job matches...");
     setMessage(null);
     try {
-      const result = await runJobMatches(accessToken, profile.id, profile.preferred_role, 10);
+      const result = await runJobMatches(
+        accessToken,
+        profile.id,
+        jobMatchQuery.trim() || profile.preferred_role,
+        jobMatchLimit,
+      );
       setJobMatchResult(result);
       setMessage(result.matches.length ? "Job matches ranked." : "No job references found yet.");
     } catch (error) {
@@ -1065,6 +1196,11 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onUploadResume={handleUpload}
           />
           <ResumeUploadSummary
+            activeTargetLabel={
+              jobResult
+                ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
+                : null
+            }
             isBusy={isBusy}
             isSavedOutputsLoading={isSavedOutputsLoading}
             uploadResult={uploadResult}
@@ -1095,7 +1231,15 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             isBusy={isBusy}
             isVisible={Boolean(profile)}
             jobForm={jobForm}
+            jobOptions={jobOptions}
+            matchLimit={jobMatchLimit}
+            matchQuery={jobMatchQuery}
+            selectedJobId={jobResult?.id ?? null}
             onCreateJobDescription={handleCreateJobDescription}
+            onMatchLimitChange={setJobMatchLimit}
+            onMatchQueryChange={setJobMatchQuery}
+            onRunJobMatches={handleRunJobMatches}
+            onSelectJobDescription={handleSelectJobDescription}
           />
           <JobAnalysisResults
             dashboardResult={dashboardResult}
@@ -1104,6 +1248,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             jobMatchResult={jobMatchResult}
             jobResult={jobResult}
             skillGapResult={skillGapResult}
+            onGenerateFromJobMatch={handleSaveJobMatchAndGenerate}
+            onSaveJobMatchAsTarget={handleSaveJobMatchAsTarget}
             onRunSkillGap={handleRunSkillGap}
           />
           <ReportResults

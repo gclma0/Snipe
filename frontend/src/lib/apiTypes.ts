@@ -387,6 +387,8 @@ export type JobMatch = {
   concerns: string[];
   explanation: string;
   apply_recommendation: "strong_apply" | "apply_with_tailoring" | "build_evidence_first";
+  structured_job: StructuredJobDescription;
+  source_excerpt: string;
   citation: {
     document_id: string;
     chunk_id: string | null;

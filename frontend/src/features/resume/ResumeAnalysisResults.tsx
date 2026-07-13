@@ -6,6 +6,7 @@ import {
   BasicReportResult,
   DeterministicScoreResult,
   FullCareerReportResult,
+  JobMatch,
   JobDescriptionResult,
   JobMatchResult,
   ReadinessDashboardResult,
@@ -67,6 +68,8 @@ type JobAnalysisResultsProps = {
   isBusy: boolean;
   hasUploadResult: boolean;
   onRunSkillGap: () => void;
+  onGenerateFromJobMatch: (match: JobMatch, outputType: "tailoring" | "interview" | "materials") => void;
+  onSaveJobMatchAsTarget: (match: JobMatch) => void;
 };
 
 export function JobAnalysisResults({
@@ -77,6 +80,8 @@ export function JobAnalysisResults({
   isBusy,
   hasUploadResult,
   onRunSkillGap,
+  onGenerateFromJobMatch,
+  onSaveJobMatchAsTarget,
 }: JobAnalysisResultsProps) {
   return (
     <>
@@ -153,6 +158,24 @@ export function JobAnalysisResults({
                   Source: {item.citation.title}
                   {item.citation.source_url ? ` (${item.citation.source_url})` : ""}
                 </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onSaveJobMatchAsTarget(item)}>
+                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                    Save as target job
+                  </button>
+                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "tailoring")}>
+                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                    Generate tailoring
+                  </button>
+                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "interview")}>
+                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                    Generate interview prep
+                  </button>
+                  <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onGenerateFromJobMatch(item, "materials")}>
+                    <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                    Generate materials
+                  </button>
+                </div>
               </div>
             ))}
           </div>

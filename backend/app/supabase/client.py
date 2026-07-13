@@ -196,6 +196,32 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else None
 
+    def list_job_descriptions(
+        self,
+        *,
+        profile_id: str,
+        user_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/job_descriptions",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,user_id,profile_id,source_type,input_hash,"
+                        "structured_json,created_at"
+                    ),
+                    "profile_id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Job descriptions list failed: {response.text[:300]}")
+        return response.json()
+
     def create_generated_output(self, payload: dict[str, Any]) -> dict[str, Any]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.post(

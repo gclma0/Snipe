@@ -3,6 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app.jobs.job_parser import parse_job_description
+from app.jobs.schemas import StructuredJobDescription
 from app.matching.skill_gap import SkillGapResult, analyze_skill_gap
 from app.rag.schemas import RagCitation, RagSearchResult
 
@@ -33,6 +34,8 @@ class JobMatch(BaseModel):
     concerns: list[str] = Field(default_factory=list)
     explanation: str
     apply_recommendation: Literal["strong_apply", "apply_with_tailoring", "build_evidence_first"]
+    structured_job: StructuredJobDescription
+    source_excerpt: str
     citation: JobMatchCitation
 
 
@@ -91,8 +94,10 @@ def build_job_match_query(normalized_profile: dict[str, Any], fallback: str | No
 
 
 def _match_citation(*, normalized_profile: dict[str, Any], citation: RagCitation) -> JobMatch:
-    structured_job = parse_job_description(citation.content).model_dump()
-    if not structured_job.get("title"):
+    structured_job_result = parse_job_description(citation.content)
+    structured_job = structured_job_result.model_dump()
+    if not structured_job_result.title:
+        structured_job_result.title = citation.title
         structured_job["title"] = citation.title
     skill_gap = analyze_skill_gap(normalized_profile, structured_job)
     match_score = _combined_score(skill_gap=skill_gap, semantic_score=citation.score)
@@ -115,6 +120,8 @@ def _match_citation(*, normalized_profile: dict[str, Any], citation: RagCitation
         concerns=concerns,
         explanation=_explanation(match_score, matched, missing, citation.title),
         apply_recommendation=_apply_recommendation(match_score, missing),
+        structured_job=structured_job_result,
+        source_excerpt=citation.content[:60000],
         citation=JobMatchCitation(
             document_id=citation.document_id,
             chunk_id=citation.chunk_id,

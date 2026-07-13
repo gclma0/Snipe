@@ -125,6 +125,8 @@ def test_job_matcher_ranks_by_deterministic_skill_alignment_before_semantic_scor
     assert result.matches[0].title == "Data Analyst"
     assert result.matches[0].match_score > result.matches[1].match_score
     assert result.matches[0].matched_skills == ["communication", "excel", "python", "sql"]
+    assert result.matches[0].structured_job.title == "Data Analyst"
+    assert "Python, SQL, Excel" in result.matches[0].source_excerpt
     assert "react" in result.matches[1].missing_skills
     assert result.checks["uses_deterministic_ranking"] is True
 
@@ -186,6 +188,8 @@ def test_job_match_endpoint_returns_ranked_matches_and_persists_analysis() -> No
     body = response.json()
     assert body["matches"][0]["title"] == "Data Analyst"
     assert body["matches"][0]["matched_skills"] == ["communication", "excel", "python", "sql"]
+    assert body["matches"][0]["structured_job"]["title"] == "Data Analyst"
+    assert "Python, SQL, Excel" in body["matches"][0]["source_excerpt"]
     assert fake.requested_limit == 5
     assert fake.analyses[0]["analysis_type"] == "job_match"
     assert fake.analyses[0]["profile_version"] == 3

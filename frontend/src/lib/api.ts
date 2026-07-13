@@ -146,6 +146,10 @@ export function createJobDescription(token: string, profileId: string, text: str
   });
 }
 
+export function listJobDescriptions(token: string, profileId: string) {
+  return request<JobDescriptionResult[]>(`/profiles/${profileId}/job-descriptions`, token);
+}
+
 export function runSkillGapAnalysis(token: string, profileId: string, jobDescriptionId: string) {
   return request<SkillGapResult>(`/profiles/${profileId}/analyses/skill-gap`, token, {
     method: "POST",

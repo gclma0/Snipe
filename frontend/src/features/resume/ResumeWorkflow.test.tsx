@@ -53,6 +53,7 @@ describe("ResumeWorkflow", () => {
           created_at: "2026-07-13T12:00:00Z",
         },
       ],
+      [],
     ]);
     render(<ResumeWorkflow accessToken="token" />);
 
@@ -60,6 +61,89 @@ describe("ResumeWorkflow", () => {
 
     expect(await screen.findByText(/Profile ready for Operations Analyst/i)).toBeInTheDocument();
     expect(screen.getByText("Saved interview prep summary.")).toBeInTheDocument();
+  });
+
+  it("reuses a saved target job for skill gap analysis", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      [
+        {
+          id: "profile-id",
+          career_goal: "Prepare for a target role",
+          preferred_role: "Operations Analyst",
+          profile_status: "draft",
+        },
+      ],
+      [],
+      [
+        {
+          id: "job-id",
+          profile_id: "profile-id",
+          source_type: "pasted_text",
+          input_hash: "job-hash",
+          structured: {
+            parser_version: "deterministic-job-parser-v1",
+            title: "Senior Operations Analyst",
+            company: "Acme Logistics",
+            required_skills: ["excel", "sql"],
+            preferred_skills: ["tableau"],
+            tools: ["tableau"],
+            soft_skills: ["communication"],
+            responsibilities: ["Lead reporting"],
+            education: [],
+            experience_requirements: [],
+            seniority: "senior",
+            ats_keywords: ["excel", "sql", "tableau"],
+          },
+        },
+      ],
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        analysis_type: "skill_gap",
+        deterministic_version: "deterministic-skill-gap-v1",
+        score: 70,
+        matched_skills: [{ skill: "excel", category: "required", importance: "high", evidence: "resume" }],
+        partially_matched_skills: [],
+        missing_skills: [{ skill: "sql", category: "required", importance: "high", evidence: null }],
+        transferable_skills: [],
+        claimed_but_unverified_skills: [],
+        not_relevant_skills: [],
+        checks: { has_job_skills: true },
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.click(screen.getByRole("button", { name: /Load latest profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.selectOptions(await screen.findByLabelText(/Saved target jobs/i), "job-id");
+    await user.click(await screen.findByRole("button", { name: /Run skill gap analysis/i }));
+
+    expect(await screen.findByText("Skill gap")).toBeInTheDocument();
+    expect(screen.getByText("sql")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("/profiles/profile-id/analyses/skill-gap"),
+      expect.objectContaining({
+        body: JSON.stringify({ job_description_id: "job-id" }),
+      }),
+    );
   });
 
   it("groups post-upload actions by workflow area", async () => {
@@ -322,7 +406,7 @@ describe("ResumeWorkflow", () => {
 
   it("renders deterministic job matches", async () => {
     const user = userEvent.setup();
-    mockFetch([
+    const fetchMock = mockFetch([
       {
         id: "profile-id",
         career_goal: "Prepare for a target role",
@@ -366,6 +450,22 @@ describe("ResumeWorkflow", () => {
             concerns: ["Missing required skills: tableau."],
             explanation: "Data Analyst scored 88 because the profile matches python, sql, excel.",
             apply_recommendation: "apply_with_tailoring",
+            structured_job: {
+              parser_version: "deterministic-job-parser-v1",
+              title: "Data Analyst",
+              company: null,
+              required_skills: ["python", "sql", "excel", "tableau"],
+              preferred_skills: [],
+              tools: ["tableau"],
+              soft_skills: [],
+              responsibilities: ["Build dashboards"],
+              education: [],
+              experience_requirements: [],
+              seniority: null,
+              ats_keywords: ["python", "sql", "excel", "tableau"],
+            },
+            source_excerpt:
+              "Data Analyst Requirements Python, SQL, Excel, Tableau. Responsibilities Build dashboards, collaborate with stakeholders, and improve reporting workflows.",
             citation: {
               document_id: "job-1",
               chunk_id: "chunk-1",
@@ -381,6 +481,60 @@ describe("ResumeWorkflow", () => {
           uses_source_citations: true,
         },
       },
+      {
+        id: "target-job-id",
+        profile_id: "profile-id",
+        source_type: "pasted_text",
+        input_hash: "target-job-hash",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Data Analyst",
+          company: null,
+          required_skills: ["python", "sql", "excel", "tableau"],
+          preferred_skills: [],
+          tools: ["tableau"],
+          soft_skills: [],
+          responsibilities: ["Build dashboards"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["python", "sql", "excel", "tableau"],
+        },
+      },
+      {
+        id: "target-job-id-2",
+        profile_id: "profile-id",
+        source_type: "pasted_text",
+        input_hash: "target-job-hash-2",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Data Analyst",
+          company: null,
+          required_skills: ["python", "sql", "excel", "tableau"],
+          preferred_skills: [],
+          tools: ["tableau"],
+          soft_skills: [],
+          responsibilities: ["Build dashboards"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["python", "sql", "excel", "tableau"],
+        },
+      },
+      {
+        output_type: "ai_resume_tailoring_package",
+        output_version: "ai-resume-tailoring-package-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        summary: "Tailoring generated for saved match.",
+        tailored_summary: "Evidence-bound analyst summary.",
+        skill_order: ["sql", "excel"],
+        keyword_recommendations: [],
+        missing_evidence_warnings: [],
+        cautions: [],
+        cached: false,
+      },
+      [],
     ]);
     render(<ResumeWorkflow accessToken="token" />);
 
@@ -389,12 +543,29 @@ describe("ResumeWorkflow", () => {
     const fileInput = await screen.findByLabelText(/Upload resume/i);
     const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
     await user.upload(fileInput, file);
-    await user.click(await screen.findByRole("button", { name: /^Job matches$/i }));
+    await user.type(await screen.findByLabelText(/Search query/i), "remote analytics sql");
+    await user.selectOptions(screen.getByLabelText(/Results/i), "5");
+    await user.click(screen.getByRole("button", { name: /Run job match search/i }));
 
     expect(await screen.findByRole("heading", { name: "Job matches" })).toBeInTheDocument();
     expect(screen.getAllByText("Data Analyst").length).toBeGreaterThan(0);
     expect(screen.getByText("Apply with tailoring")).toBeInTheDocument();
     expect(screen.getByText(/Analytics job listing/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/profiles/profile-id/job-matches"),
+      expect.objectContaining({
+        body: JSON.stringify({ query: "remote analytics sql", limit: 5 }),
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Save as target job/i }));
+
+    expect(await screen.findByText("Job match saved as the active target job.")).toBeInTheDocument();
+    expect(screen.getByText("Active target selected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Generate tailoring$/i }));
+
+    expect(await screen.findByText("Tailoring generated for saved match.")).toBeInTheDocument();
+    expect(screen.getByText("Job match saved and tailoring package generated.")).toBeInTheDocument();
   });
 
   it("renders generated claim verification questions", async () => {

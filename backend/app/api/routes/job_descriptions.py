@@ -30,6 +30,35 @@ class JobDescriptionResponse(BaseModel):
     structured: StructuredJobDescription
 
 
+@router.get("", response_model=list[JobDescriptionResponse])
+def list_job_descriptions(
+    profile_id: str,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> list[JobDescriptionResponse]:
+    try:
+        if not supabase.profile_belongs_to_user(profile_id=profile_id, user_id=user.id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        rows = supabase.list_job_descriptions(profile_id=profile_id, user_id=user.id)
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return [
+        JobDescriptionResponse(
+            id=row.get("id"),
+            profile_id=row.get("profile_id") or profile_id,
+            source_type=row.get("source_type") or "unknown",
+            input_hash=row.get("input_hash") or "",
+            structured=StructuredJobDescription(**(row.get("structured_json") or {})),
+        )
+        for row in rows
+    ]
+
+
 @router.post("", response_model=JobDescriptionResponse, status_code=status.HTTP_201_CREATED)
 def create_job_description_from_text(
     profile_id: str,

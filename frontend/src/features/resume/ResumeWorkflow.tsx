@@ -628,7 +628,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <Sparkles aria-hidden="true" className="h-4 w-4" />
                 Generate AI interpretation
               </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy || !aiInterpretationResult} type="button" onClick={() => handleCreateAIInterpretation(true)}>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(true)}>
                 <Sparkles aria-hidden="true" className="h-4 w-4" />
                 Regenerate AI interpretation
               </button>
@@ -636,7 +636,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Generate rewrite suggestions
               </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy || !rewriteResult} type="button" onClick={() => handleCreateRewriteSuggestions(true)}>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(true)}>
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Regenerate rewrite suggestions
               </button>

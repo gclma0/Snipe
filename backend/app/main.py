@@ -6,6 +6,7 @@ from app.api.routes.analyses import router as analyses_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.generated_outputs import router as generated_outputs_router
 from app.api.routes.health import router as health_router
+from app.api.routes.interview import router as interview_router
 from app.api.routes.job_descriptions import router as job_descriptions_router
 from app.api.routes.job_matches import router as job_matches_router
 from app.api.routes.privacy import router as privacy_router
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ai_router, prefix="/api/v1")
     app.include_router(generated_outputs_router, prefix="/api/v1")
     app.include_router(rag_router, prefix="/api/v1")
+    app.include_router(interview_router, prefix="/api/v1")
     app.include_router(privacy_router, prefix="/api/v1")
     return app
 

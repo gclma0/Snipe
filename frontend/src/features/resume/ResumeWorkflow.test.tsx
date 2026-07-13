@@ -71,6 +71,7 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Regenerate prep/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Claim questions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate claims/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mock interview/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Project roadmap$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate roadmap/i })).toBeInTheDocument();
   });
@@ -417,6 +418,114 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("strong")).toBeInTheDocument();
     expect(screen.getByText(/What specific example proves/)).toBeInTheDocument();
     expect(screen.queryByText(/lie detector/i)).not.toBeInTheDocument();
+  });
+
+  it("runs a mock interview turn", async () => {
+    const user = userEvent.setup();
+    const session = {
+      session_id: "session-1",
+      version: "deterministic-mock-interview-v1",
+      status: "active",
+      current_index: 0,
+      questions: [
+        {
+          category: "technical",
+          question: "Tell me about a real example where you used SQL.",
+          evidence_to_use: ["Built SQL dashboards."],
+        },
+      ],
+      transcript: [],
+    };
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Data Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      session,
+      {
+        session: {
+          ...session,
+          status: "completed",
+          current_index: 1,
+          transcript: [
+            {
+              question: session.questions[0],
+              answer: "I built SQL dashboards.",
+              evaluation: {
+                output_type: "interview_answer_evaluation",
+                output_version: "deterministic-answer-evaluation-v1",
+                relevance_score: 70,
+                clarity_score: 85,
+                evidence_score: 80,
+                depth_score: 50,
+                confidence_score: 85,
+                overall_score: 72,
+                star_feedback: ["Situation: missing."],
+                strengths: ["The answer uses evidence connected to the profile."],
+                improvements: ["Add scope, action, and result details using the STAR method."],
+                improved_answer: "I would strengthen this with STAR details.",
+                follow_up_question: "What was your exact role?",
+                cautions: ["Do not add unsupported metrics."],
+              },
+              follow_up_question: "What was your exact role?",
+            },
+          ],
+        },
+        evaluation: {
+          output_type: "interview_answer_evaluation",
+          output_version: "deterministic-answer-evaluation-v1",
+          relevance_score: 70,
+          clarity_score: 85,
+          evidence_score: 80,
+          depth_score: 50,
+          confidence_score: 85,
+          overall_score: 72,
+          star_feedback: ["Situation: missing."],
+          strengths: ["The answer uses evidence connected to the profile."],
+          improvements: ["Add scope, action, and result details using the STAR method."],
+          improved_answer: "I would strengthen this with STAR details.",
+          follow_up_question: "What was your exact role?",
+          cautions: ["Do not add unsupported metrics."],
+        },
+        follow_up_question: "What was your exact role?",
+        next_question: null,
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Data Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /^Mock interview$/i }));
+
+    expect(await screen.findByText("Tell me about a real example where you used SQL.")).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("Type your answer here."), "I built SQL dashboards.");
+    await user.click(screen.getByRole("button", { name: /Submit answer/i }));
+
+    expect(await screen.findByText("Latest evaluation")).toBeInTheDocument();
+    expect(screen.getByText("What was your exact role?")).toBeInTheDocument();
+    expect(screen.getByText(/Completed 1 interview turns/i)).toBeInTheDocument();
   });
 });
 

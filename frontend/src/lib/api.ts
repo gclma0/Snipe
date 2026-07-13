@@ -239,6 +239,52 @@ export type ClaimVerificationResult = {
   cached: boolean;
 };
 
+export type AnswerEvaluationResult = {
+  output_type: string;
+  output_version: string;
+  relevance_score: number;
+  clarity_score: number;
+  evidence_score: number;
+  depth_score: number;
+  confidence_score: number;
+  overall_score: number;
+  star_feedback: string[];
+  strengths: string[];
+  improvements: string[];
+  improved_answer: string;
+  follow_up_question: string;
+  cautions: string[];
+};
+
+export type MockInterviewQuestion = {
+  category: string;
+  question: string;
+  evidence_to_use: string[];
+};
+
+export type MockInterviewTranscriptItem = {
+  question: MockInterviewQuestion;
+  answer: string;
+  evaluation: AnswerEvaluationResult;
+  follow_up_question: string;
+};
+
+export type MockInterviewSession = {
+  session_id: string;
+  version: string;
+  status: "active" | "completed";
+  current_index: number;
+  questions: MockInterviewQuestion[];
+  transcript: MockInterviewTranscriptItem[];
+};
+
+export type MockInterviewTurnResult = {
+  session: MockInterviewSession;
+  evaluation: AnswerEvaluationResult;
+  follow_up_question: string;
+  next_question: MockInterviewQuestion | null;
+};
+
 export type ProjectRecommendation = {
   title: string;
   objective: string;
@@ -584,6 +630,62 @@ export function createClaimVerificationQuestions(
     body: JSON.stringify({
       job_description_id: jobDescriptionId ?? null,
       force_regenerate: forceRegenerate,
+    }),
+  });
+}
+
+export function startMockInterview(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  questionCount = 5,
+) {
+  return request<MockInterviewSession>(`/profiles/${profileId}/interview/sessions`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      question_count: questionCount,
+    }),
+  });
+}
+
+export function answerMockInterview(
+  token: string,
+  profileId: string,
+  session: MockInterviewSession,
+  answer: string,
+) {
+  return request<MockInterviewTurnResult>(`/profiles/${profileId}/interview/sessions/messages`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ session, answer }),
+  });
+}
+
+export function evaluateInterviewAnswer(
+  token: string,
+  profileId: string,
+  payload: {
+    question: string;
+    answer: string;
+    evidence_to_use?: string[];
+    category?: string | null;
+  },
+) {
+  return request<AnswerEvaluationResult>(`/profiles/${profileId}/interview/answer-evaluation`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...payload,
+      evidence_to_use: payload.evidence_to_use ?? [],
+      category: payload.category ?? null,
     }),
   });
 }

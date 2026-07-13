@@ -27,6 +27,7 @@ import {
   BasicReportResult,
   AIInterpretationResult,
   ApplicationMaterialsResult,
+  AnswerEvaluationResult,
   CandidateProfile,
   ClaimVerificationResult,
   DeterministicScoreResult,
@@ -36,6 +37,7 @@ import {
   JobDescriptionResult,
   JobMatchResult,
   LinkedInSourceResult,
+  MockInterviewSession,
   PortfolioSourceResult,
   ProjectRoadmapResult,
   ReadinessDashboardResult,
@@ -47,6 +49,7 @@ import {
   addGitHubSource,
   addLinkedInTextSource,
   addPortfolioSource,
+  answerMockInterview,
   createAIReadinessInterpretation,
   createApplicationMaterials,
   createBasicReport,
@@ -67,6 +70,7 @@ import {
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
+  startMockInterview,
   uploadLinkedInSource,
   uploadResume,
 } from "@/lib/api";
@@ -133,6 +137,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
   const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
   const [claimVerificationResult, setClaimVerificationResult] = useState<ClaimVerificationResult | null>(null);
+  const [mockInterviewSession, setMockInterviewSession] = useState<MockInterviewSession | null>(null);
+  const [mockInterviewEvaluation, setMockInterviewEvaluation] = useState<AnswerEvaluationResult | null>(null);
+  const [mockInterviewAnswer, setMockInterviewAnswer] = useState("");
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
@@ -208,6 +215,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -240,6 +250,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -353,6 +366,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -394,6 +410,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setTailoringResult(null);
       setInterviewResult(null);
       setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -653,6 +672,55 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Claim questions loaded from cache." : "Claim questions generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate claim questions.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleStartMockInterview() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Starting mock interview...");
+    setMessage(null);
+    try {
+      const result = await startMockInterview(accessToken, profile.id, jobResult?.id ?? null, 5);
+      setMockInterviewSession(result);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
+      setMessage("Mock interview started.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not start mock interview.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleSubmitMockAnswer() {
+    if (!accessToken || !profile || !mockInterviewSession || !mockInterviewAnswer.trim()) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Evaluating interview answer...");
+    setMessage(null);
+    try {
+      const result = await answerMockInterview(
+        accessToken,
+        profile.id,
+        mockInterviewSession,
+        mockInterviewAnswer,
+      );
+      setMockInterviewSession(result.session);
+      setMockInterviewEvaluation(result.evaluation);
+      setMockInterviewAnswer("");
+      setMessage(result.session.status === "completed" ? "Mock interview completed." : "Answer evaluated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not evaluate answer.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -1033,6 +1101,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateClaimVerification(true)}>
                       <MessageSquare aria-hidden="true" className="h-4 w-4" />
                       Regenerate claims
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleStartMockInterview}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Mock interview
                     </button>
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(false)}>
                       <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
@@ -1471,6 +1543,66 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {mockInterviewSession ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Mock interview</h3>
+                <p className="text-xs text-muted-foreground">
+                  {mockInterviewSession.status === "completed"
+                    ? "Completed"
+                    : `Question ${mockInterviewSession.current_index + 1} of ${mockInterviewSession.questions.length}`}
+                </p>
+              </div>
+              {mockInterviewSession.status === "active" ? (
+                <div className="mt-4 border border-border p-3">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    {mockInterviewSession.questions[mockInterviewSession.current_index]?.category.replace("_", " ")}
+                  </p>
+                  <p className="mt-2 font-medium">
+                    {mockInterviewSession.questions[mockInterviewSession.current_index]?.question}
+                  </p>
+                  <JobField
+                    label="Evidence to use"
+                    values={mockInterviewSession.questions[mockInterviewSession.current_index]?.evidence_to_use ?? []}
+                  />
+                  <textarea
+                    className="mt-3 min-h-28 w-full border border-border px-3 py-2 text-sm"
+                    placeholder="Type your answer here."
+                    value={mockInterviewAnswer}
+                    onChange={(event) => setMockInterviewAnswer(event.target.value)}
+                  />
+                  <button className="mt-3 inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy || !mockInterviewAnswer.trim()} type="button" onClick={handleSubmitMockAnswer}>
+                    <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                    Submit answer
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-muted-foreground">
+                  Completed {mockInterviewSession.transcript.length} interview turns.
+                </p>
+              )}
+              {mockInterviewEvaluation ? (
+                <div className="mt-4 border border-border p-3">
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-medium">Latest evaluation</p>
+                    <p className="text-2xl font-semibold">{mockInterviewEvaluation.overall_score}</p>
+                  </div>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <JobField label="Relevance" values={[String(mockInterviewEvaluation.relevance_score)]} />
+                    <JobField label="Clarity" values={[String(mockInterviewEvaluation.clarity_score)]} />
+                    <JobField label="Evidence" values={[String(mockInterviewEvaluation.evidence_score)]} />
+                    <JobField label="Depth" values={[String(mockInterviewEvaluation.depth_score)]} />
+                    <JobField label="STAR feedback" values={mockInterviewEvaluation.star_feedback} />
+                    <JobField label="Improvements" values={mockInterviewEvaluation.improvements} />
+                  </dl>
+                  <p className="mt-3 font-medium">Follow-up</p>
+                  <p className="mt-1 text-muted-foreground">{mockInterviewEvaluation.follow_up_question}</p>
+                  <p className="mt-3 font-medium">Improved answer frame</p>
+                  <p className="mt-1 text-muted-foreground">{mockInterviewEvaluation.improved_answer}</p>
+                </div>
               ) : null}
             </div>
           ) : null}

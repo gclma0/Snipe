@@ -472,6 +472,7 @@ def _local_template_resume_tailoring(context: dict[str, Any]) -> ResumeTailoring
     verified_skills = context.get("verified_skills") or []
     target_job = context.get("target_job") or {}
     skill_gap = context.get("skill_gap") or {}
+    generation_mode = context.get("generation_mode")
     required = _string_list(
         target_job.get("required_skills") if isinstance(target_job, dict) else []
     )
@@ -490,6 +491,7 @@ def _local_template_resume_tailoring(context: dict[str, Any]) -> ResumeTailoring
         preferred=preferred,
         ats_keywords=ats_keywords,
         matched=matched,
+        alternate=generation_mode == "alternate",
     )
     keyword_recommendations = _keyword_recommendations(
         ordered_skills=ordered_skills,
@@ -514,11 +516,22 @@ def _local_template_resume_tailoring(context: dict[str, Any]) -> ResumeTailoring
             ),
         )
     role = target_job.get("title") if isinstance(target_job, dict) else None
-    tailored_summary = _tailored_summary(role=role, ordered_skills=ordered_skills)
+    tailored_summary = _tailored_summary(
+        role=role,
+        ordered_skills=ordered_skills,
+        alternate=generation_mode == "alternate",
+    )
     return ResumeTailoringPackageResult(
         provider="local_template",
         model_name="local-template-v1",
         summary=(
+            "Regenerated tailoring package uses an alternate evidence-bound structure."
+            if verified_skills and generation_mode == "alternate"
+            else (
+                "Regenerated tailoring is limited because no verified skills were found."
+            )
+            if generation_mode == "alternate"
+            else
             "Tailoring package generated from verified skills and target-job requirements."
             if verified_skills
             else "Tailoring is limited because no verified skills were found."
@@ -556,9 +569,14 @@ def _ordered_tailored_skills(
     preferred: list[str],
     ats_keywords: list[str],
     matched: list[str],
+    alternate: bool = False,
 ) -> list[str]:
     verified_lookup = {skill.lower(): skill for skill in verified_skills}
-    priority_terms = required + preferred + ats_keywords + matched
+    priority_terms = (
+        matched + ats_keywords + required + preferred
+        if alternate
+        else required + preferred + ats_keywords + matched
+    )
     ordered: list[str] = []
     for term in priority_terms:
         key = term.lower()
@@ -612,13 +630,28 @@ def _keyword_recommendations(
     return recommendations[:12]
 
 
-def _tailored_summary(role: str | None, ordered_skills: list[str]) -> str:
+def _tailored_summary(
+    role: str | None,
+    ordered_skills: list[str],
+    *,
+    alternate: bool = False,
+) -> str:
     if ordered_skills:
         skill_text = ", ".join(ordered_skills[:4])
         if role:
+            if alternate:
+                return (
+                    f"For {role} applications, lead with verified strengths in {skill_text}; "
+                    "keep unsupported keywords out until real evidence is available."
+                )
             return (
                 f"Candidate targeting {role} roles with verified experience signals in "
                 f"{skill_text}. Add only true outcomes and scope details where supported."
+            )
+        if alternate:
+            return (
+                f"Lead with verified strengths in {skill_text}, then add only evidence-backed "
+                "scope or outcome details."
             )
         return (
             f"Candidate with verified experience signals in {skill_text}. Add only true "

@@ -368,6 +368,26 @@ def test_local_resume_tailoring_warns_about_missing_evidence() -> None:
     assert result.keyword_recommendations[0].evidence_status == "missing_evidence"
 
 
+def test_local_resume_tailoring_alternate_mode_changes_package() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_resume_tailoring_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_tailoring_package(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_tailoring_package(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.tailored_summary != alternate_result.tailored_summary
+
+
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:
     fake = FakeSupabaseClient(
         profile={

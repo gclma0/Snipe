@@ -185,6 +185,28 @@ export type ResumeTailoringPackageResult = {
   cached: boolean;
 };
 
+export type InterviewQuestion = {
+  category: "role_specific" | "technical" | "behavioral" | "screening";
+  question: string;
+  why_it_matters: string;
+  answer_guidance: string;
+  evidence_to_use: string[];
+  missing_evidence_warning: string | null;
+};
+
+export type InterviewPrepResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  questions: InterviewQuestion[];
+  star_guidance: string[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ProfileDeletionResult = {
   profile_id: string;
   deleted: boolean;
@@ -382,6 +404,24 @@ export function createResumeTailoringPackage(
   forceRegenerate = false,
 ) {
   return request<ResumeTailoringPackageResult>(`/profiles/${profileId}/ai/resume-tailoring-package`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      job_description_id: jobDescriptionId ?? null,
+      force_regenerate: forceRegenerate,
+    }),
+  });
+}
+
+export function createInterviewPrep(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<InterviewPrepResult>(`/profiles/${profileId}/ai/interview-prep`, token, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

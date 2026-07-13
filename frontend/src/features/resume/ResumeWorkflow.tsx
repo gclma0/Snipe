@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Linkedin,
   LinkIcon,
+  MessageSquare,
   Plus,
   ScrollText,
   Sparkles,
@@ -24,6 +25,7 @@ import {
   CandidateProfile,
   DeterministicScoreResult,
   GitHubSourceResult,
+  InterviewPrepResult,
   JobDescriptionResult,
   LinkedInSourceResult,
   PortfolioSourceResult,
@@ -38,6 +40,7 @@ import {
   addPortfolioSource,
   createAIReadinessInterpretation,
   createBasicReport,
+  createInterviewPrep,
   createJobDescription,
   createResumeRewriteSuggestions,
   createResumeTailoringPackage,
@@ -99,6 +102,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
+  const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const form = useForm<ProfileValues>({
@@ -158,6 +162,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
+      setInterviewResult(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -182,6 +187,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
+      setInterviewResult(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -287,6 +293,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
+      setInterviewResult(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -320,6 +327,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
+      setInterviewResult(null);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -410,6 +418,29 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.cached ? "Tailoring package loaded from cache." : "Tailoring package generated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not generate tailoring package.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateInterviewPrep(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createInterviewPrep(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setInterviewResult(result);
+      setMessage(result.cached ? "Interview prep loaded from cache." : "Interview prep generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
     } finally {
       setIsBusy(false);
     }
@@ -678,6 +709,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
                 Regenerate tailoring package
               </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(false)}>
+                <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                Generate interview prep
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateInterviewPrep(true)}>
+                <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                Regenerate interview prep
+              </button>
             </dl>
           ) : null}
           {qualityResult ? (
@@ -879,6 +918,57 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               {tailoringResult.cautions.length ? (
                 <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
                   {tailoringResult.cautions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {interviewResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Interview prep</h3>
+                <p className="text-xs text-muted-foreground">
+                  {interviewResult.cached ? "Cached" : interviewResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{interviewResult.summary}</p>
+              {interviewResult.star_guidance.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {interviewResult.star_guidance.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {interviewResult.questions.length ? (
+                <div className="mt-4 grid gap-3">
+                  {interviewResult.questions.map((item) => (
+                    <div key={`${item.category}-${item.question}`} className="border border-border p-3">
+                      <p className="text-xs font-medium uppercase text-muted-foreground">
+                        {item.category.replace("_", " ")}
+                      </p>
+                      <p className="mt-2 font-medium">{item.question}</p>
+                      <p className="mt-2 text-muted-foreground">{item.why_it_matters}</p>
+                      <p className="mt-2">{item.answer_guidance}</p>
+                      <JobField label="Evidence to use" values={item.evidence_to_use} />
+                      {item.missing_evidence_warning ? (
+                        <p className="mt-2 text-muted-foreground">{item.missing_evidence_warning}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {interviewResult.missing_evidence_warnings.length ? (
+                <dl className="mt-4 grid gap-3">
+                  <JobField
+                    label="Missing evidence"
+                    values={interviewResult.missing_evidence_warnings.slice(0, 6)}
+                  />
+                </dl>
+              ) : null}
+              {interviewResult.cautions.length ? (
+                <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {interviewResult.cautions.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>

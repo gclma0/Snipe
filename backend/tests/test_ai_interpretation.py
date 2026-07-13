@@ -4,10 +4,13 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.ai.context import build_ai_interpretation_context
+from app.ai.interview import build_interview_prep_context
 from app.ai.llm import (
     AIClient,
     AIInterpretationResult,
     AIRecommendation,
+    InterviewPrepResult,
+    InterviewQuestion,
     KeywordInsertionRecommendation,
     ResumeRewriteResult,
     ResumeRewriteSuggestion,
@@ -31,6 +34,7 @@ class FakeAIClient:
     prompts: list[dict[str, Any]] = []
     rewrite_prompts: list[dict[str, Any]] = []
     tailoring_prompts: list[dict[str, Any]] = []
+    interview_prompts: list[dict[str, Any]] = []
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -91,6 +95,31 @@ class FakeAIClient:
             ],
             missing_evidence_warnings=["Add communication only if supported by real evidence."],
             cautions=["Do not invent unsupported skills."],
+        )
+
+    def generate_interview_prep(
+        self,
+        context: dict[str, Any],
+    ) -> InterviewPrepResult:
+        self.interview_prompts.append(context)
+        return InterviewPrepResult(
+            provider="fake",
+            model_name="fake-model",
+            summary="Interview prep is evidence-bound.",
+            questions=[
+                InterviewQuestion(
+                    category="role_specific",
+                    question="How would you approach the Operations Analyst role?",
+                    why_it_matters="Tests role understanding.",
+                    answer_guidance="Use only verified Excel, SQL, and operations examples.",
+                    evidence_to_use=["excel", "sql", "operations"],
+                )
+            ],
+            star_guidance=["Situation: use a real context.", "Result: use a true outcome."],
+            missing_evidence_warnings=[
+                "Add communication only if supported by real evidence."
+            ],
+            cautions=["Do not invent unsupported stories."],
         )
 
 
@@ -192,6 +221,7 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
     FakeAIClient.prompts = []
     FakeAIClient.rewrite_prompts = []
     FakeAIClient.tailoring_prompts = []
+    FakeAIClient.interview_prompts = []
     monkeypatch.setattr(ai_route, "AIClient", FakeAIClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
@@ -386,6 +416,58 @@ def test_local_resume_tailoring_alternate_mode_changes_package() -> None:
 
     assert default_result.summary != alternate_result.summary
     assert default_result.tailored_summary != alternate_result.tailored_summary
+
+
+def test_interview_prep_context_excludes_raw_resume_sections() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_interview_prep_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
+    assert len(context["experience_signals"]) <= 5
+    assert all(len(item) <= 220 for item in context["experience_signals"])
+    assert context["verified_skills"] == ["excel", "operations", "project management", "sql"]
+
+
+def test_local_interview_prep_warns_about_missing_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_interview_prep_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interview_prep(context)
+
+    assert "limited" in result.summary.lower()
+    assert result.star_guidance
+    assert "no verified skills" in result.missing_evidence_warnings[0].lower()
+    assert all("invent" not in item.question.lower() for item in result.questions)
+
+
+def test_local_interview_prep_alternate_mode_changes_questions() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_interview_prep_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interview_prep(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interview_prep(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.questions[0].question != alternate_result.questions[0].question
 
 
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:
@@ -694,3 +776,119 @@ def test_resume_tailoring_endpoint_returns_cached_output(monkeypatch) -> None:
     assert response.json()["summary"] == "Cached tailoring."
     assert fake.outputs == []
     assert FakeAIClient.tailoring_prompts == []
+
+
+def test_interview_prep_endpoint_generates_and_persists(monkeypatch) -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/interview-prep",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["provider"] == "fake"
+    assert body["questions"][0]["category"] == "role_specific"
+    assert fake.outputs[0]["output_type"] == "ai_interview_prep"
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.interview_prompts[0])
+
+
+def test_interview_prep_endpoint_returns_cached_output(monkeypatch) -> None:
+    cached_result = InterviewPrepResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached interview prep.",
+        questions=[
+            InterviewQuestion(
+                category="behavioral",
+                question="Cached question?",
+                why_it_matters="Cached reason.",
+                answer_guidance="Cached guidance.",
+                evidence_to_use=["excel"],
+            )
+        ],
+        star_guidance=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/interview-prep",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is True
+    assert response.json()["summary"] == "Cached interview prep."
+    assert fake.outputs == []
+    assert FakeAIClient.interview_prompts == []
+
+
+def test_interview_prep_force_regenerate_bypasses_cached_output(monkeypatch) -> None:
+    cached_result = InterviewPrepResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached interview prep.",
+        questions=[],
+        star_guidance=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/interview-prep",
+        json={"job_description_id": TEST_JOB_ID, "force_regenerate": True},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is False
+    assert response.json()["summary"] == "Interview prep is evidence-bound."
+    assert fake.outputs
+    assert FakeAIClient.interview_prompts[0]["generation_mode"] == "alternate"

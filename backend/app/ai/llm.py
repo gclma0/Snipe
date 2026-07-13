@@ -69,6 +69,28 @@ class ResumeTailoringPackageResult(BaseModel):
     cached: bool = False
 
 
+class InterviewQuestion(BaseModel):
+    category: str = Field(pattern="^(role_specific|technical|behavioral|screening)$")
+    question: str
+    why_it_matters: str
+    answer_guidance: str
+    evidence_to_use: list[str] = Field(default_factory=list, max_length=6)
+    missing_evidence_warning: str | None = None
+
+
+class InterviewPrepResult(BaseModel):
+    output_type: str = "ai_interview_prep"
+    output_version: str = "ai-interview-prep-v1"
+    provider: str
+    model_name: str
+    summary: str
+    questions: list[InterviewQuestion] = Field(default_factory=list, max_length=10)
+    star_guidance: list[str] = Field(default_factory=list, max_length=6)
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class AIProviderError(RuntimeError):
     pass
 
@@ -101,6 +123,13 @@ class AIClient:
             return _local_template_resume_tailoring(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._openai_compatible_resume_tailoring(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_interview_prep(self, context: dict[str, Any]) -> InterviewPrepResult:
+        if self.provider == "local_template":
+            return _local_template_interview_prep(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._openai_compatible_interview_prep(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
@@ -190,6 +219,28 @@ class AIClient:
         )
         try:
             return ResumeTailoringPackageResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def _openai_compatible_interview_prep(
+        self,
+        context: dict[str, Any],
+    ) -> InterviewPrepResult:
+        parsed = self._openai_compatible_json(
+            task=(
+                "Create evidence-bound interview preparation with role-specific, technical or "
+                "profession-specific, behavioral, and screening questions. Include STAR answer "
+                "guidance and missing-evidence warnings. Do not write fabricated answers or "
+                "invent skills, achievements, metrics, employers, credentials, or experience."
+            ),
+            context=context,
+        )
+        try:
+            return InterviewPrepResult(
                 provider=self.provider,
                 model_name=self.model_name,
                 **parsed,
@@ -549,6 +600,169 @@ def _local_template_resume_tailoring(context: dict[str, Any]) -> ResumeTailoring
     )
 
 
+def _local_template_interview_prep(context: dict[str, Any]) -> InterviewPrepResult:
+    verified_skills = _string_list(context.get("verified_skills"))
+    experience_signals = _string_list(context.get("experience_signals"))
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    readiness = context.get("readiness") or {}
+    generation_mode = context.get("generation_mode")
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    role_name = role or readiness.get("primary_specialization") or "the target role"
+    required = _string_list(
+        target_job.get("required_skills") if isinstance(target_job, dict) else []
+    )
+    preferred = _string_list(
+        target_job.get("preferred_skills") if isinstance(target_job, dict) else []
+    )
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    matched = _string_list(skill_gap.get("matched") if isinstance(skill_gap, dict) else [])
+    priority_skills = _interview_priority_skills(
+        verified_skills=verified_skills,
+        matched=matched,
+        required=required,
+        preferred=preferred,
+        alternate=generation_mode == "alternate",
+    )
+    questions: list[InterviewQuestion] = [
+        InterviewQuestion(
+            category="role_specific",
+            question=(
+                f"What parts of the {role_name} role are you strongest in, and where would "
+                "you need onboarding?"
+                if generation_mode == "alternate"
+                else f"How would you approach the main responsibilities of a {role_name}?"
+            ),
+            why_it_matters=(
+                "This checks whether the candidate understands the role and can map real "
+                "evidence to it."
+            ),
+            answer_guidance=(
+                "Use verified strengths first, then name any gaps honestly and explain the "
+                "learning plan without claiming unsupported experience."
+            ),
+            evidence_to_use=(priority_skills[:3] or experience_signals[:2]),
+            missing_evidence_warning=(
+                None
+                if priority_skills or experience_signals
+                else (
+                    "No verified role evidence was found; add real skills or experience before "
+                    "using a strong answer."
+                )
+            ),
+        )
+    ]
+    for skill in priority_skills[:3]:
+        questions.append(
+            InterviewQuestion(
+                category="technical",
+                question=(
+                    f"Walk me through a practical example where {skill} affected your work."
+                    if generation_mode == "alternate"
+                    else f"Tell me about a time you used {skill} in real work or a project."
+                ),
+                why_it_matters=(
+                    "This verifies that a listed skill is supported by practical evidence."
+                ),
+                answer_guidance=(
+                    "Give a real situation, the task you owned, the actions you took, and the "
+                    "result. Add a metric only if it is true."
+                ),
+                evidence_to_use=[skill],
+            )
+        )
+    if experience_signals:
+        signal = experience_signals[0]
+        questions.append(
+            InterviewQuestion(
+                category="behavioral",
+                question=(
+                    "Describe a challenge from one of your listed experiences and how you "
+                    "handled it."
+                    if generation_mode == "alternate"
+                    else f"Tell me about a challenge related to this experience: {signal}"
+                ),
+                why_it_matters=(
+                    "Behavioral questions test decision-making, ownership, and communication."
+                ),
+                answer_guidance=(
+                    "Use the STAR structure and keep the example tied to the actual experience "
+                    "signal Snipe found."
+                ),
+                evidence_to_use=[signal],
+            )
+        )
+    for skill in missing[:3]:
+        questions.append(
+            InterviewQuestion(
+                category="screening",
+                question=f"If asked about {skill}, how should you answer honestly?",
+                why_it_matters=(
+                    "The target job mentions this area, but the profile does not verify it."
+                ),
+                answer_guidance=(
+                    "Do not claim experience you do not have. State your actual exposure, related "
+                    "transferable experience, or a concrete learning plan."
+                ),
+                evidence_to_use=[],
+                missing_evidence_warning=(
+                    f"{skill} is not supported by verified profile evidence. Add it only after "
+                    "real experience, education, certification, portfolio, or LinkedIn "
+                    "evidence exists."
+                ),
+            )
+        )
+    warnings = [
+        (
+            f"{skill} appears important for the target role, but Snipe did not find verified "
+            "evidence for it."
+        )
+        for skill in missing[:6]
+    ]
+    if not verified_skills:
+        warnings.insert(
+            0,
+            (
+                "No verified skills were found. Add real evidence for skills such as Excel, "
+                "SQL, tools, methods, or profession-specific capabilities before practicing "
+                "strong skill-based answers."
+            ),
+        )
+    return InterviewPrepResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Regenerated interview prep uses an alternate evidence-bound question set."
+            if verified_skills and generation_mode == "alternate"
+            else (
+                "Regenerated interview prep is limited because no verified skills were found."
+            )
+            if generation_mode == "alternate"
+            else (
+                "Interview prep generated from verified profile signals and target-job "
+                "requirements."
+            )
+            if verified_skills
+            else "Interview prep is limited because no verified skills were found."
+        ),
+        questions=questions[:10],
+        star_guidance=[
+            "Situation: choose a real work, project, education, or portfolio context.",
+            "Task: state your actual responsibility without expanding your role.",
+            "Action: describe specific steps you personally took.",
+            "Result: include a true outcome; use a bracketed placeholder only until you verify it.",
+            "Do not include unsupported skills, metrics, employers, credentials, or achievements.",
+        ],
+        missing_evidence_warnings=warnings[:8],
+        cautions=[
+            (
+                "Practice answers should be based on real evidence. Do not memorize fabricated "
+                "stories or unsupported claims."
+            )
+        ],
+    )
+
+
 def _rewrite_evidence(
     *,
     verified_skills: list[str],
@@ -586,6 +800,29 @@ def _ordered_tailored_skills(
         if skill not in ordered:
             ordered.append(skill)
     return ordered[:20]
+
+
+def _interview_priority_skills(
+    *,
+    verified_skills: list[str],
+    matched: list[str],
+    required: list[str],
+    preferred: list[str],
+    alternate: bool = False,
+) -> list[str]:
+    verified_lookup = {skill.lower(): skill for skill in verified_skills}
+    priority_terms = (
+        matched + preferred + required if alternate else required + matched + preferred
+    )
+    ordered: list[str] = []
+    for term in priority_terms:
+        key = term.lower()
+        if key in verified_lookup and verified_lookup[key] not in ordered:
+            ordered.append(verified_lookup[key])
+    for skill in verified_skills:
+        if skill not in ordered:
+            ordered.append(skill)
+    return ordered[:8]
 
 
 def _keyword_recommendations(

@@ -19,16 +19,7 @@ from app.ai.claim_verification import (
 )
 from app.ai.context import ai_context_hash, build_ai_interpretation_context
 from app.ai.interview import build_interview_prep_context, interview_context_hash
-from app.ai.llm import (
-    AIClient,
-    AIInterpretationResult,
-    AIProviderError,
-    ApplicationMaterialsResult,
-    InterviewPrepResult,
-    ProjectRoadmapResult,
-    ResumeRewriteResult,
-    ResumeTailoringPackageResult,
-)
+from app.ai.llm import AIClient
 from app.ai.markdown import (
     application_materials_markdown,
     career_transition_markdown,
@@ -46,8 +37,17 @@ from app.ai.outreach import (
     generate_outreach_message_pack,
     outreach_context_hash,
 )
+from app.ai.providers import AIProviderError
 from app.ai.resume_rewrite import build_resume_rewrite_context, rewrite_context_hash
 from app.ai.roadmap import build_project_roadmap_context, project_roadmap_context_hash
+from app.ai.schemas import (
+    AIInterpretationResult,
+    ApplicationMaterialsResult,
+    InterviewPrepResult,
+    ProjectRoadmapResult,
+    ResumeRewriteResult,
+    ResumeTailoringPackageResult,
+)
 from app.ai.tailoring import build_resume_tailoring_context, tailoring_context_hash
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.scoring.readiness import build_readiness_dashboard
@@ -799,4 +799,3 @@ def _get_structured_job(
             detail="Job description not found.",
         )
     return job_description.get("structured_json") or {}
-

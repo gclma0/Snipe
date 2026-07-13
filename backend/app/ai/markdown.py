@@ -1,6 +1,7 @@
 from app.ai.career_transition import CareerTransitionResult
 from app.ai.claim_verification import ClaimVerificationResult
-from app.ai.llm import (
+from app.ai.outreach import OutreachMessagePack
+from app.ai.schemas import (
     AIInterpretationResult,
     ApplicationMaterialsResult,
     InterviewPrepResult,
@@ -8,7 +9,6 @@ from app.ai.llm import (
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
 )
-from app.ai.outreach import OutreachMessagePack
 
 
 def interpretation_markdown(result: AIInterpretationResult) -> str:

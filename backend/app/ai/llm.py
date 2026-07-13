@@ -1,147 +1,21 @@
-import json
 from typing import Any
 
-import httpx
-from pydantic import BaseModel, Field, ValidationError
-
+from app.ai.providers import AIProviderError, OpenAICompatibleProvider
+from app.ai.schemas import (
+    AIInterpretationResult,
+    AIRecommendation,
+    ApplicationMaterialsResult,
+    InterviewPrepResult,
+    InterviewQuestion,
+    KeywordInsertionRecommendation,
+    ProjectRecommendation,
+    ProjectRoadmapResult,
+    ResumeRewriteResult,
+    ResumeRewriteSuggestion,
+    ResumeTailoringPackageResult,
+    RoadmapStep,
+)
 from app.core.config import Settings
-
-
-class AIRecommendation(BaseModel):
-    title: str
-    rationale: str
-    action: str
-    priority: str = Field(pattern="^(high|medium|low)$")
-
-
-class AIInterpretationResult(BaseModel):
-    output_type: str = "ai_readiness_interpretation"
-    output_version: str = "ai-readiness-interpretation-v1"
-    provider: str
-    model_name: str
-    summary: str
-    readiness_explanation: str
-    recommendations: list[AIRecommendation] = Field(min_length=1, max_length=6)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class ResumeRewriteSuggestion(BaseModel):
-    original: str
-    suggested: str
-    rationale: str
-    evidence_used: list[str] = Field(default_factory=list, max_length=6)
-    needs_candidate_value: bool = False
-
-
-class ResumeRewriteResult(BaseModel):
-    output_type: str = "ai_resume_rewrite_suggestions"
-    output_version: str = "ai-resume-rewrite-suggestions-v1"
-    provider: str
-    model_name: str
-    summary: str
-    suggestions: list[ResumeRewriteSuggestion] = Field(default_factory=list, max_length=5)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class KeywordInsertionRecommendation(BaseModel):
-    keyword: str
-    placement: str
-    reason: str
-    evidence_status: str = Field(pattern="^(verified|missing_evidence)$")
-
-
-class ResumeTailoringPackageResult(BaseModel):
-    output_type: str = "ai_resume_tailoring_package"
-    output_version: str = "ai-resume-tailoring-package-v1"
-    provider: str
-    model_name: str
-    summary: str
-    tailored_summary: str
-    skill_order: list[str] = Field(default_factory=list, max_length=20)
-    keyword_recommendations: list[KeywordInsertionRecommendation] = Field(
-        default_factory=list,
-        max_length=12,
-    )
-    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class InterviewQuestion(BaseModel):
-    category: str = Field(
-        pattern=(
-            "^(role_specific|technical|behavioral|situational|resume_based|project_based|"
-            "portfolio_based|leadership|career_transition|job_specific|screening)$"
-        )
-    )
-    question: str
-    why_it_matters: str
-    answer_guidance: str
-    evidence_to_use: list[str] = Field(default_factory=list, max_length=6)
-    missing_evidence_warning: str | None = None
-
-
-class InterviewPrepResult(BaseModel):
-    output_type: str = "ai_interview_prep"
-    output_version: str = "ai-interview-prep-v1"
-    provider: str
-    model_name: str
-    summary: str
-    questions: list[InterviewQuestion] = Field(default_factory=list, max_length=12)
-    star_guidance: list[str] = Field(default_factory=list, max_length=6)
-    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class ProjectRecommendation(BaseModel):
-    title: str
-    objective: str
-    skills_practiced: list[str] = Field(default_factory=list, max_length=8)
-    deliverables: list[str] = Field(default_factory=list, max_length=6)
-    evidence_to_add: list[str] = Field(default_factory=list, max_length=6)
-    missing_evidence_warning: str | None = None
-
-
-class RoadmapStep(BaseModel):
-    timeframe: str = Field(pattern="^(7_day|30_day|90_day)$")
-    focus: str
-    actions: list[str] = Field(default_factory=list, max_length=8)
-    success_criteria: list[str] = Field(default_factory=list, max_length=6)
-
-
-class ProjectRoadmapResult(BaseModel):
-    output_type: str = "ai_project_roadmap_recommendations"
-    output_version: str = "ai-project-roadmap-v1"
-    provider: str
-    model_name: str
-    summary: str
-    projects: list[ProjectRecommendation] = Field(default_factory=list, max_length=3)
-    roadmap: list[RoadmapStep] = Field(default_factory=list, max_length=3)
-    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class ApplicationMaterialsResult(BaseModel):
-    output_type: str = "ai_application_materials"
-    output_version: str = "ai-application-materials-v1"
-    provider: str
-    model_name: str
-    summary: str
-    cover_letter: str
-    concise_cover_note: str
-    email_application: str
-    evidence_used: list[str] = Field(default_factory=list, max_length=8)
-    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
-    cautions: list[str] = Field(default_factory=list, max_length=5)
-    cached: bool = False
-
-
-class AIProviderError(RuntimeError):
-    pass
 
 
 class AIClient:
@@ -154,14 +28,14 @@ class AIClient:
         if self.provider == "local_template":
             return _local_template_interpretation(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_interpretation(context)
+            return self._provider().generate_interpretation(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_resume_rewrite_suggestions(self, context: dict[str, Any]) -> ResumeRewriteResult:
         if self.provider == "local_template":
             return _local_template_resume_rewrite(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_resume_rewrite(context)
+            return self._provider().generate_resume_rewrite(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_resume_tailoring_package(
@@ -171,21 +45,21 @@ class AIClient:
         if self.provider == "local_template":
             return _local_template_resume_tailoring(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_resume_tailoring(context)
+            return self._provider().generate_resume_tailoring(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_interview_prep(self, context: dict[str, Any]) -> InterviewPrepResult:
         if self.provider == "local_template":
             return _local_template_interview_prep(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_interview_prep(context)
+            return self._provider().generate_interview_prep(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_project_roadmap(self, context: dict[str, Any]) -> ProjectRoadmapResult:
         if self.provider == "local_template":
             return _local_template_project_roadmap(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_project_roadmap(context)
+            return self._provider().generate_project_roadmap(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_application_materials(
@@ -195,208 +69,11 @@ class AIClient:
         if self.provider == "local_template":
             return _local_template_application_materials(context)
         if self.provider in {"openai_compatible", "openai"}:
-            return self._openai_compatible_application_materials(context)
+            return self._provider().generate_application_materials(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
-    def _openai_compatible_interpretation(self, context: dict[str, Any]) -> AIInterpretationResult:
-        if not self.settings.ai_api_key:
-            raise AIProviderError("AI_API_KEY is required for the configured AI provider.")
-        base_url = (self.settings.ai_base_url or "https://api.openai.com/v1").rstrip("/")
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Snipe, a career assistant. Use only the compact structured "
-                        "context provided. Do not invent achievements, metrics, skills, "
-                        "employers, credentials, or experience. Return strict JSON."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "task": (
-                                "Create a concise readiness explanation and prioritized "
-                                "recommendations."
-                            ),
-                            "context": context,
-                        },
-                        sort_keys=True,
-                    ),
-                },
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.2,
-        }
-        with httpx.Client(timeout=self.settings.ai_timeout_seconds, trust_env=False) as client:
-            response = client.post(
-                f"{base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.ai_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-        if response.status_code >= 400:
-            raise AIProviderError(f"AI provider request failed with status {response.status_code}.")
-        try:
-            content = response.json()["choices"][0]["message"]["content"]
-            parsed = json.loads(content)
-            return AIInterpretationResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (KeyError, TypeError, ValueError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-    def _openai_compatible_resume_rewrite(self, context: dict[str, Any]) -> ResumeRewriteResult:
-        parsed = self._openai_compatible_json(
-            task=(
-                "Create evidence-bound resume rewrite suggestions. Do not invent metrics, "
-                "achievements, employers, skills, or experience. If a stronger bullet needs a "
-                "real metric, use a bracketed placeholder and set needs_candidate_value true."
-            ),
-            context=context,
-        )
-        try:
-            return ResumeRewriteResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (TypeError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-    def _openai_compatible_resume_tailoring(
-        self,
-        context: dict[str, Any],
-    ) -> ResumeTailoringPackageResult:
-        parsed = self._openai_compatible_json(
-            task=(
-                "Create an evidence-bound resume tailoring package with a tailored summary, "
-                "skill ordering, keyword placement recommendations, missing-evidence warnings, "
-                "and cautions. Do not invent skills, achievements, metrics, employers, or "
-                "experience."
-            ),
-            context=context,
-        )
-        try:
-            return ResumeTailoringPackageResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (TypeError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-    def _openai_compatible_interview_prep(
-        self,
-        context: dict[str, Any],
-    ) -> InterviewPrepResult:
-        parsed = self._openai_compatible_json(
-            task=(
-                "Create evidence-bound interview preparation with role-specific, technical or "
-                "profession-specific, behavioral, and screening questions. Include STAR answer "
-                "guidance and missing-evidence warnings. Do not write fabricated answers or "
-                "invent skills, achievements, metrics, employers, credentials, or experience."
-            ),
-            context=context,
-        )
-        try:
-            return InterviewPrepResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (TypeError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-    def _openai_compatible_project_roadmap(
-        self,
-        context: dict[str, Any],
-    ) -> ProjectRoadmapResult:
-        parsed = self._openai_compatible_json(
-            task=(
-                "Create evidence-bound project recommendations and 7-day, 30-day, and 90-day "
-                "roadmap steps. Recommend realistic future work only. Do not claim projects are "
-                "completed and do not invent skills, achievements, metrics, employers, "
-                "credentials, or experience."
-            ),
-            context=context,
-        )
-        try:
-            return ProjectRoadmapResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (TypeError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-    def _openai_compatible_application_materials(
-        self,
-        context: dict[str, Any],
-    ) -> ApplicationMaterialsResult:
-        parsed = self._openai_compatible_json(
-            task=(
-                "Create evidence-bound application materials: a standard cover letter, concise "
-                "cover note, and email application. Use candidate-review placeholders when "
-                "details are missing. Do not invent skills, achievements, metrics, employers, "
-                "credentials, or experience."
-            ),
-            context=context,
-        )
-        try:
-            return ApplicationMaterialsResult(
-                provider=self.provider,
-                model_name=self.model_name,
-                **parsed,
-            )
-        except (TypeError, ValidationError) as exc:
-            raise AIProviderError("AI provider returned an invalid structured response.") from exc
-
-
-    def _openai_compatible_json(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
-        if not self.settings.ai_api_key:
-            raise AIProviderError("AI_API_KEY is required for the configured AI provider.")
-        base_url = (self.settings.ai_base_url or "https://api.openai.com/v1").rstrip("/")
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Snipe, a career assistant. Use only the compact structured "
-                        "context provided. Do not invent achievements, metrics, skills, "
-                        "employers, credentials, or experience. Return strict JSON."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps({"task": task, "context": context}, sort_keys=True),
-                },
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.2,
-        }
-        with httpx.Client(timeout=self.settings.ai_timeout_seconds, trust_env=False) as client:
-            response = client.post(
-                f"{base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.ai_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-        if response.status_code >= 400:
-            raise AIProviderError(f"AI provider request failed with status {response.status_code}.")
-        try:
-            return json.loads(response.json()["choices"][0]["message"]["content"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise AIProviderError("AI provider returned invalid JSON.") from exc
+    def _provider(self) -> OpenAICompatibleProvider:
+        return OpenAICompatibleProvider(self.settings, self.provider, self.model_name)
 
 
 def _local_template_interpretation(context: dict[str, Any]) -> AIInterpretationResult:

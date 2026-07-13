@@ -2,9 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BriefcaseBusiness,
   ClipboardCheck,
-  Copy,
   Download,
-  Eye,
   FileUp,
   Gauge,
   Github,
@@ -23,6 +21,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { SavedOutputsPanel } from "@/features/resume/SavedOutputsPanel";
+import { exportContentForOutput, formatApplyRecommendation, formatRoadmapTimeframe, fullReportFilename, generatedOutputFilename } from "@/features/resume/generatedOutputFormatting";
+import { JobField, MessageBlock, ScoreCard } from "@/features/resume/resumeDisplay";
 import {
   BasicReportResult,
   AIInterpretationResult,
@@ -115,21 +116,6 @@ type LinkedInValues = z.infer<typeof linkedInSchema>;
 type ResumeWorkflowProps = {
   accessToken: string | null;
 };
-
-const outputTypeFilters = [
-  { value: "all", label: "All outputs" },
-  { value: "mvp_basic_report", label: "Basic reports" },
-  { value: "ai_readiness_interpretation", label: "AI interpretations" },
-  { value: "ai_resume_rewrite_suggestions", label: "Rewrite suggestions" },
-  { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
-  { value: "ai_interview_prep", label: "Interview prep" },
-  { value: "ai_claim_verification_questions", label: "Claim questions" },
-  { value: "ai_outreach_message_pack", label: "Outreach messages" },
-  { value: "ai_career_transition_analysis", label: "Career transition" },
-  { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
-  { value: "ai_application_materials", label: "Application materials" },
-  { value: "full_career_report", label: "Full reports" },
-] as const;
 
 export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
@@ -1516,92 +1502,21 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               </pre>
             </div>
           ) : null}
-          {generatedOutputs.length ? (
-            <div className="mt-5 border-t border-border pt-5 text-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-baseline gap-3">
-                  <h3 className="text-base font-semibold">Saved outputs</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {isHistoryRefreshing
-                      ? "Refreshing..."
-                      : `${filteredGeneratedOutputs.length} of ${generatedOutputs.length}`}
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  Type
-                  <select
-                    className="border border-border bg-white px-3 py-2 text-sm"
-                    value={generatedOutputFilter}
-                    onChange={(event) => setGeneratedOutputFilter(event.target.value)}
-                  >
-                    {outputTypeFilters.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {filteredGeneratedOutputs.length ? (
-                <div className="mt-4 grid gap-3">
-                  {filteredGeneratedOutputs.map((item) => (
-                    <div key={item.id} className="border border-border p-3">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                        <p className="font-medium">{formatOutputType(item.output_type)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatOutputDate(item.created_at)}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-muted-foreground">{generatedOutputSummary(item)}</p>
-                      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
-                        <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
-                      </dl>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isSavedOutputsLoading} type="button" onClick={() => handleOpenGeneratedOutput(item)}>
-                          <Eye aria-hidden="true" className="h-4 w-4" />
-                          View details
-                        </button>
-                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCopyGeneratedOutput(item)}>
-                          <Copy aria-hidden="true" className="h-4 w-4" />
-                          Copy markdown
-                        </button>
-                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleDownloadGeneratedOutput(item)}>
-                          <Download aria-hidden="true" className="h-4 w-4" />
-                          Download .md
-                        </button>
-                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={deletingGeneratedOutputId === item.id} type="button" onClick={() => handleDeleteGeneratedOutput(item)}>
-                          <Trash2 aria-hidden="true" className="h-4 w-4" />
-                          {deletingGeneratedOutputId === item.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-4 text-muted-foreground">No saved outputs match this filter.</p>
-              )}
-              {selectedGeneratedOutput ? (
-                <div className="mt-4 border border-border p-3">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                    <p className="font-medium">{formatOutputType(selectedGeneratedOutput.output_type)} detail</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatOutputDate(selectedGeneratedOutput.created_at)}
-                    </p>
-                  </div>
-                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <JobField label="Provider" values={[selectedGeneratedOutput.provider ?? "deterministic"]} />
-                    <JobField label="Model" values={selectedGeneratedOutput.model_name ? [selectedGeneratedOutput.model_name] : []} />
-                    <JobField label="Version" values={selectedGeneratedOutput.prompt_version ? [selectedGeneratedOutput.prompt_version] : []} />
-                    <JobField label="Status" values={[selectedGeneratedOutput.status]} />
-                  </dl>
-                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
-                    {exportContentForOutput(selectedGeneratedOutput)}
-                  </pre>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <SavedOutputsPanel
+            deletingOutputId={deletingGeneratedOutputId}
+            filter={generatedOutputFilter}
+            filteredOutputs={filteredGeneratedOutputs}
+            isBusy={isBusy}
+            isHistoryRefreshing={isHistoryRefreshing}
+            isSavedOutputsLoading={isSavedOutputsLoading}
+            outputs={generatedOutputs}
+            selectedOutput={selectedGeneratedOutput}
+            onCopy={handleCopyGeneratedOutput}
+            onDelete={handleDeleteGeneratedOutput}
+            onDownload={handleDownloadGeneratedOutput}
+            onFilterChange={setGeneratedOutputFilter}
+            onOpen={handleOpenGeneratedOutput}
+          />
           {aiInterpretationResult ? (
             <div className="mt-5 border-t border-border pt-5 text-sm">
               <div className="flex items-baseline gap-3">
@@ -2009,126 +1924,5 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       {isSavedOutputsLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading saved outputs...</p> : null}
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
-  );
-}
-
-function JobField({ label, values }: { label: string; values: string[] }) {
-  return (
-    <div>
-      <dt className="font-medium">{label}</dt>
-      <dd className="mt-1 text-muted-foreground">{values.length ? values.join(", ") : "Not found"}</dd>
-    </div>
-  );
-}
-
-function MessageBlock({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="border border-border p-3">
-      <p className="font-medium">{title}</p>
-      <pre className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{value}</pre>
-    </div>
-  );
-}
-
-function formatOutputType(outputType: string) {
-  const labels: Record<string, string> = {
-    ai_interview_prep: "Interview prep",
-    ai_claim_verification_questions: "Claim questions",
-    ai_outreach_message_pack: "Outreach messages",
-    ai_career_transition_analysis: "Career transition",
-    ai_readiness_interpretation: "AI interpretation",
-    ai_resume_rewrite_suggestions: "Rewrite suggestions",
-    ai_resume_tailoring_package: "Tailoring package",
-    mvp_basic_report: "Basic report",
-    ai_project_roadmap_recommendations: "Project roadmap",
-    ai_application_materials: "Application materials",
-    full_career_report: "Full report",
-  };
-  return labels[outputType] ?? outputType.replace(/_/g, " ");
-}
-
-function generatedOutputSummary(output: GeneratedOutput) {
-  const summary = output.result_json.summary;
-  if (typeof summary === "string" && summary.trim()) {
-    return summary;
-  }
-  const title = output.result_json.title;
-  if (typeof title === "string" && title.trim()) {
-    return title;
-  }
-  return "Saved generated output.";
-}
-
-function exportContentForOutput(output: GeneratedOutput) {
-  if (output.result_markdown?.trim()) {
-    return output.result_markdown;
-  }
-  return [
-    `# ${formatOutputType(output.output_type)}`,
-    "",
-    "```json",
-    JSON.stringify(output.result_json, null, 2),
-    "```",
-    "",
-  ].join("\n");
-}
-
-function generatedOutputFilename(output: GeneratedOutput) {
-  const date = output.created_at ? new Date(output.created_at) : null;
-  const datePart =
-    date && !Number.isNaN(date.getTime())
-      ? date.toISOString().slice(0, 10)
-      : "saved-output";
-  const typePart = output.output_type.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
-  return `snipe-${typePart || "output"}-${datePart}.md`.toLowerCase();
-}
-
-function fullReportFilename(report: FullCareerReportResult) {
-  const titlePart = report.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
-  return `snipe-${titlePart || "full-career-report"}.md`.toLowerCase();
-}
-
-function formatRoadmapTimeframe(value: string) {
-  const labels: Record<string, string> = {
-    "7_day": "7-day plan",
-    "30_day": "30-day plan",
-    "90_day": "90-day plan",
-  };
-  return labels[value] ?? value.replace(/_/g, " ");
-}
-
-function formatApplyRecommendation(value: string) {
-  const labels: Record<string, string> = {
-    strong_apply: "Strong apply",
-    apply_with_tailoring: "Apply with tailoring",
-    build_evidence_first: "Build evidence first",
-  };
-  return labels[value] ?? value.replace(/_/g, " ");
-}
-
-function formatOutputDate(value: string | null) {
-  if (!value) {
-    return "Date unavailable";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString();
-}
-
-function ScoreCard({ title, result }: { title: string; result: DeterministicScoreResult }) {
-  const topFinding = result.findings[0];
-
-  return (
-    <div className="border border-border p-3">
-      <p className="font-medium">{title}</p>
-      <p className="mt-2 text-2xl font-semibold">{result.score}</p>
-      {topFinding ? (
-        <p className="mt-2 text-muted-foreground">{topFinding.recommendation}</p>
-      ) : (
-        <p className="mt-2 text-muted-foreground">No major readiness issues found.</p>
-      )}
-    </div>
   );
 }

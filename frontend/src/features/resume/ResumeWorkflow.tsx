@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 
 import { SavedOutputsPanel } from "@/features/resume/SavedOutputsPanel";
 import { ProfileSourcesPanel } from "@/features/resume/ProfileSourcesPanel";
+import { RagReferencePanel } from "@/features/resume/RagReferencePanel";
 import { JobAnalysisResults, ReadinessResults, ReportResults } from "@/features/resume/ResumeAnalysisResults";
 import { AIResultsPanel } from "@/features/resume/AIResultsPanel";
 import { ResumeUploadSummary } from "@/features/resume/ResumeUploadSummary";
@@ -42,6 +43,9 @@ import {
   OutreachMessagePack,
   PortfolioSourceResult,
   PrivacyDataSummaryResult,
+  RagDocumentResult,
+  RagSearchResult,
+  RagSourceType,
   ProjectRoadmapResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
@@ -63,6 +67,7 @@ import {
   createOutreachMessagePack,
   createJobDescription,
   createProjectRoadmap,
+  createRagDocument,
   createResumeRewriteSuggestions,
   createResumeTailoringPackage,
   createProfile,
@@ -80,6 +85,7 @@ import {
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
+  searchRagReferences,
   startMockInterview,
   uploadLinkedInSource,
   uploadResume,
@@ -118,6 +124,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [careerTransitionResult, setCareerTransitionResult] = useState<CareerTransitionResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
+  const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
+  const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [selectedGeneratedOutput, setSelectedGeneratedOutput] = useState<GeneratedOutput | null>(null);
@@ -129,6 +137,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
   const [jobMatchQuery, setJobMatchQuery] = useState("");
   const [jobMatchLimit, setJobMatchLimit] = useState(10);
+  const [ragTitle, setRagTitle] = useState("");
+  const [ragSourceType, setRagSourceType] = useState<RagSourceType>("job_listing");
+  const [ragSourceUrl, setRagSourceUrl] = useState("");
+  const [ragText, setRagText] = useState("");
+  const [ragQuery, setRagQuery] = useState("");
+  const [ragLimit, setRagLimit] = useState(5);
   const activeTargetLabel = jobResult
     ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
     : null;
@@ -1171,6 +1185,62 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleIngestRagReference() {
+    if (!accessToken) {
+      return;
+    }
+
+    if (!ragTitle.trim() || ragText.trim().length < 100) {
+      setMessage("Reference title and at least 100 characters of text are required.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await createRagDocument(accessToken, {
+        title: ragTitle.trim(),
+        source_type: ragSourceType,
+        source_url: ragSourceUrl.trim() || null,
+        text: ragText.trim(),
+      });
+      setRagDocumentResult(result);
+      setRagQuery((current) => current || result.title);
+      setMessage("Reference added to the library.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not add reference.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleSearchRagReferences() {
+    if (!accessToken) {
+      return;
+    }
+
+    if (ragQuery.trim().length < 2) {
+      setMessage("Enter at least 2 characters to search references.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await searchRagReferences(accessToken, {
+        query: ragQuery.trim(),
+        source_types: [],
+        limit: ragLimit,
+      });
+      setRagSearchResult(result);
+      setMessage(result.citations.length ? "References searched." : "No matching references found.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not search references.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <section className="mt-8 max-w-2xl border border-border bg-white p-5">
       <h2 className="text-base font-semibold">Candidate profile</h2>
@@ -1242,6 +1312,27 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onRunJobMatches={handleRunJobMatches}
             onSelectJobDescription={handleSelectJobDescription}
           />
+          {profile ? (
+            <RagReferencePanel
+              documentResult={ragDocumentResult}
+              isBusy={isBusy}
+              limit={ragLimit}
+              query={ragQuery}
+              searchResult={ragSearchResult}
+              sourceType={ragSourceType}
+              sourceUrl={ragSourceUrl}
+              text={ragText}
+              title={ragTitle}
+              onIngest={handleIngestRagReference}
+              onLimitChange={setRagLimit}
+              onQueryChange={setRagQuery}
+              onSearch={handleSearchRagReferences}
+              onSourceTypeChange={setRagSourceType}
+              onSourceUrlChange={setRagSourceUrl}
+              onTextChange={setRagText}
+              onTitleChange={setRagTitle}
+            />
+          ) : null}
           <JobAnalysisResults
             dashboardResult={dashboardResult}
             hasUploadResult={Boolean(uploadResult)}

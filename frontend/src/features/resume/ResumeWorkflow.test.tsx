@@ -300,6 +300,77 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /^Delete$/i })).toBeInTheDocument();
   });
 
+  it("adds and searches reference library documents", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Data Analyst",
+        profile_status: "draft",
+      },
+      {
+        document_id: "doc-1",
+        title: "Data Analyst Job Listing",
+        source_type: "job_listing",
+        content_hash: "content-hash",
+        chunk_count: 2,
+        embedding_model: "deterministic-hashing-v1",
+      },
+      {
+        query: "python sql analytics",
+        embedding_model: "deterministic-hashing-v1",
+        citations: [
+          {
+            document_id: "doc-1",
+            chunk_id: "chunk-1",
+            title: "Data Analyst Job Listing",
+            source_type: "job_listing",
+            source_url: "https://example.com/jobs/data",
+            chunk_index: 0,
+            content: "Python SQL analytics dashboards stakeholder reporting.",
+            score: 0.91,
+            metadata: {},
+          },
+        ],
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Data Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    await user.type(await screen.findByLabelText(/^Title$/i), "Data Analyst Job Listing");
+    await user.selectOptions(screen.getByLabelText(/Source type/i), "job_listing");
+    await user.type(screen.getByLabelText(/Source URL/i), "https://example.com/jobs/data");
+    await user.type(
+      screen.getByLabelText(/Reference text/i),
+      "Python SQL analytics dashboards stakeholder reporting ".repeat(4),
+    );
+    await user.click(screen.getByRole("button", { name: /Add reference/i }));
+
+    expect(await screen.findByText(/Added Data Analyst Job Listing as 2 searchable chunk/i)).toBeInTheDocument();
+    await user.clear(screen.getByLabelText(/^Query$/i));
+    await user.type(screen.getByLabelText(/^Query$/i), "python sql analytics");
+    await user.selectOptions(screen.getByLabelText(/Reference results/i), "5");
+    await user.click(screen.getByRole("button", { name: /Search references/i }));
+
+    expect(await screen.findByText("Python SQL analytics dashboards stakeholder reporting.")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/documents"),
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/search"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          source_types: [],
+          limit: 5,
+          query: "python sql analytics",
+        }),
+      }),
+    );
+  });
+
   it("opens and deletes a saved output", async () => {
     const user = userEvent.setup();
     const fetchMock = mockFetch([
@@ -586,7 +657,7 @@ describe("ResumeWorkflow", () => {
     const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
     await user.upload(fileInput, file);
     await user.type(await screen.findByLabelText(/Search query/i), "remote analytics sql");
-    await user.selectOptions(screen.getByLabelText(/Results/i), "5");
+    await user.selectOptions(screen.getByLabelText(/^Results$/i), "5");
     await user.click(screen.getByRole("button", { name: /Run job match search/i }));
 
     expect(await screen.findByRole("heading", { name: "Job matches" })).toBeInTheDocument();
@@ -834,7 +905,7 @@ describe("ResumeWorkflow", () => {
     await user.click(await screen.findByRole("button", { name: /Data summary/i }));
 
     expect(await screen.findByText("Raw uploaded documents are private.")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /Full report/i }));
 

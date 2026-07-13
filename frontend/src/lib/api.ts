@@ -44,6 +44,9 @@ export type {
   GitHubSourceResult,
   PortfolioSourceResult,
   LinkedInSourceResult,
+  RagDocumentResult,
+  RagSearchResult,
+  RagSourceType,
 } from "./apiTypes";
 
 import type {
@@ -76,6 +79,9 @@ import type {
   GitHubSourceResult,
   PortfolioSourceResult,
   LinkedInSourceResult,
+  RagDocumentResult,
+  RagSearchResult,
+  RagSourceType,
 } from "./apiTypes";
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
@@ -511,5 +517,47 @@ export function uploadLinkedInSource(token: string, profileId: string, file: Fil
   return request<LinkedInSourceResult>(`/profiles/${profileId}/sources/linkedin/upload`, token, {
     method: "POST",
     body,
+  });
+}
+
+export function createRagDocument(
+  token: string,
+  payload: {
+    title: string;
+    source_type: RagSourceType;
+    text: string;
+    source_url?: string | null;
+  },
+) {
+  return request<RagDocumentResult>("/rag/documents", token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...payload,
+      source_url: payload.source_url || null,
+    }),
+  });
+}
+
+export function searchRagReferences(
+  token: string,
+  payload: {
+    query: string;
+    source_types?: RagSourceType[];
+    limit?: number;
+  },
+) {
+  return request<RagSearchResult>("/rag/search", token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source_types: payload.source_types ?? [],
+      limit: payload.limit ?? 5,
+      query: payload.query,
+    }),
   });
 }

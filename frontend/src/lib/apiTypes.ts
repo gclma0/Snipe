@@ -482,3 +482,32 @@ export type LinkedInSourceResult = {
   evidence_count: number;
   profile_version: number | null;
 };
+
+export type RagSourceType = "job_description" | "role_framework" | "career_guidance" | "job_listing";
+
+export type RagDocumentResult = {
+  document_id: string | null;
+  title: string;
+  source_type: RagSourceType;
+  content_hash: string;
+  chunk_count: number;
+  embedding_model: string;
+};
+
+export type RagCitation = {
+  document_id: string;
+  chunk_id: string | null;
+  title: string;
+  source_type: RagSourceType;
+  source_url: string | null;
+  chunk_index: number;
+  content: string;
+  score: number;
+  metadata: Record<string, unknown>;
+};
+
+export type RagSearchResult = {
+  query: string;
+  embedding_model: string;
+  citations: RagCitation[];
+};

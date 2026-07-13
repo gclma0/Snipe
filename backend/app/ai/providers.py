@@ -9,6 +9,7 @@ from app.ai.schemas import (
     ApplicationMaterialsResult,
     InterviewPrepResult,
     LearningPlanResult,
+    LinkedInOptimizationResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
@@ -127,6 +128,29 @@ class OpenAICompatibleProvider:
         )
         try:
             return LearningPlanResult(
+                provider=self.provider,
+                model_name=self.model_name,
+                **parsed,
+            )
+        except (TypeError, ValidationError) as exc:
+            raise AIProviderError("AI provider returned an invalid structured response.") from exc
+
+    def generate_linkedin_optimization(
+        self,
+        context: dict[str, Any],
+    ) -> LinkedInOptimizationResult:
+        parsed = self._request_json(
+            task=(
+                "Create evidence-bound LinkedIn optimization recommendations: headline "
+                "options, About section, experience recommendations, skills to feature, "
+                "profile checklist, missing-evidence warnings, and cautions. Do not scrape "
+                "LinkedIn and do not invent skills, achievements, metrics, employers, "
+                "credentials, or experience."
+            ),
+            context=context,
+        )
+        try:
+            return LinkedInOptimizationResult(
                 provider=self.provider,
                 model_name=self.model_name,
                 **parsed,

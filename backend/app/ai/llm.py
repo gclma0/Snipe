@@ -10,6 +10,8 @@ from app.ai.schemas import (
     KeywordInsertionRecommendation,
     LearningPlanResult,
     LearningPlanStep,
+    LinkedInExperienceRecommendation,
+    LinkedInOptimizationResult,
     ProjectRecommendation,
     ProjectRoadmapResult,
     ResumeRewriteResult,
@@ -69,6 +71,16 @@ class AIClient:
             return _local_template_learning_plan(context)
         if self.provider in {"openai_compatible", "openai"}:
             return self._provider().generate_learning_plan(context)
+        raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
+
+    def generate_linkedin_optimization(
+        self,
+        context: dict[str, Any],
+    ) -> LinkedInOptimizationResult:
+        if self.provider == "local_template":
+            return _local_template_linkedin_optimization(context)
+        if self.provider in {"openai_compatible", "openai"}:
+            return self._provider().generate_linkedin_optimization(context)
         raise AIProviderError(f"Unsupported AI_PROVIDER: {self.provider}.")
 
     def generate_application_materials(
@@ -893,6 +905,152 @@ def _local_template_learning_plan(context: dict[str, Any]) -> LearningPlanResult
     )
 
 
+def _local_template_linkedin_optimization(
+    context: dict[str, Any],
+) -> LinkedInOptimizationResult:
+    verified_skills = _string_list(context.get("verified_skills"))
+    experience_signals = _string_list(context.get("experience_signals"))
+    linkedin_source = context.get("linkedin_source") or {}
+    target_job = context.get("target_job") or {}
+    skill_gap = context.get("skill_gap") or {}
+    readiness = context.get("readiness") or {}
+    generation_mode = context.get("generation_mode")
+    role = target_job.get("title") if isinstance(target_job, dict) else None
+    role_name = role or readiness.get("primary_specialization") or "target roles"
+    matched = _string_list(skill_gap.get("matched") if isinstance(skill_gap, dict) else [])
+    missing = _string_list(skill_gap.get("missing") if isinstance(skill_gap, dict) else [])
+    source_skills = _string_list(
+        linkedin_source.get("skill_signals") if isinstance(linkedin_source, dict) else []
+    )
+    skills_to_feature = _linkedin_skills_to_feature(
+        verified_skills=verified_skills,
+        source_skills=source_skills,
+        matched=matched,
+        alternate=generation_mode == "alternate",
+    )
+    skill_text = ", ".join(skills_to_feature[:4]) if skills_to_feature else "verified skills"
+    evidence = experience_signals[:3] or _string_list(
+        linkedin_source.get("experience_signals") if isinstance(linkedin_source, dict) else []
+    )[:3]
+    evidence_text = evidence[0] if evidence else "[candidate-verified experience example]"
+    headline_options = (
+        [
+            f"{role_name} candidate | Evidence in {skill_text}",
+            f"{skill_text.title()} profile for {role_name}",
+            f"Evidence-backed {role_name} profile",
+        ]
+        if generation_mode == "alternate"
+        else [
+            f"{role_name} candidate with verified {skill_text}",
+            f"{skill_text.title()} | {role_name}",
+            f"Evidence-backed profile for {role_name}",
+        ]
+    )
+    about_section = (
+        f"I am targeting {role_name} opportunities and keeping this profile grounded in "
+        f"verified evidence. My strongest current signals include {skill_text}. One relevant "
+        f"example to review is: {evidence_text}. I avoid listing tools, metrics, credentials, "
+        "or achievements unless I can support them with real work, education, projects, "
+        "certifications, portfolio, resume, or LinkedIn evidence."
+    )
+    if generation_mode == "alternate":
+        about_section = (
+            f"For {role_name} roles, I want my LinkedIn profile to emphasize verified strengths "
+            f"in {skill_text}. A profile reviewer should connect those strengths to evidence "
+            f"such as: {evidence_text}. Any missing target skills should be added only after "
+            "real supporting proof exists."
+        )
+    recommendations = [
+        LinkedInExperienceRecommendation(
+            section="Headline",
+            recommendation=(
+                "Lead with the target role and verified skills instead of broad adjectives."
+            ),
+            evidence_to_use=skills_to_feature[:4],
+            missing_evidence_warning=(
+                "Add real skills first before using a skills-heavy headline."
+                if not skills_to_feature
+                else None
+            ),
+        ),
+        LinkedInExperienceRecommendation(
+            section="About",
+            recommendation=(
+                "Use a short evidence-bound narrative: target role, verified strengths, "
+                "one real example, and honest gaps."
+            ),
+            evidence_to_use=evidence[:3] or skills_to_feature[:3],
+            missing_evidence_warning=(
+                "Add one real experience, project, education, or certification example."
+                if not evidence
+                else None
+            ),
+        ),
+        LinkedInExperienceRecommendation(
+            section="Experience",
+            recommendation=(
+                "Rewrite experience entries to mirror the resume only where facts are verified."
+            ),
+            evidence_to_use=evidence[:3],
+            missing_evidence_warning=(
+                "No compact experience signal was found; paste LinkedIn text or upload a "
+                "resume/profile source with real experience before expanding this section."
+                if not evidence
+                else None
+            ),
+        ),
+    ]
+    warnings = [
+        (
+            f"{skill} appears important for the target role, but Snipe did not find verified "
+            "evidence. Do not add it to LinkedIn skills until it is true and supported."
+        )
+        for skill in missing[:6]
+    ]
+    if not verified_skills:
+        warnings.insert(
+            0,
+            (
+                "No verified skills were found. Add real skills and evidence before using "
+                "skills-heavy LinkedIn wording."
+            ),
+        )
+    return LinkedInOptimizationResult(
+        provider="local_template",
+        model_name="local-template-v1",
+        summary=(
+            "Regenerated LinkedIn optimization uses alternate evidence-bound positioning."
+            if verified_skills and generation_mode == "alternate"
+            else (
+                "Regenerated LinkedIn optimization is limited because no verified skills were "
+                "found."
+            )
+            if generation_mode == "alternate"
+            else "LinkedIn optimization generated from verified profile and target-role signals."
+            if verified_skills
+            else "LinkedIn optimization is limited because no verified skills were found."
+        ),
+        headline_options=headline_options[:5],
+        about_section=about_section,
+        experience_recommendations=recommendations,
+        skills_to_feature=skills_to_feature,
+        profile_checklist=[
+            "Use a headline with target role and verified skills.",
+            "Keep About section claims tied to real evidence.",
+            "Mirror resume facts without adding unsupported metrics.",
+            "Feature only skills that are true and defensible.",
+            "Add portfolio, certification, or project links only when they exist.",
+        ],
+        missing_evidence_warnings=warnings[:8],
+        cautions=[
+            (
+                "Do not add LinkedIn skills, achievements, metrics, credentials, employers, "
+                "or experience unless they are true and supported by real evidence."
+            )
+        ],
+    )
+
+
 def _local_template_application_materials(
     context: dict[str, Any],
 ) -> ApplicationMaterialsResult:
@@ -1087,6 +1245,28 @@ def _application_evidence(
             ordered.append(skill)
     ordered.extend(signal for signal in experience_signals[:2] if signal not in ordered)
     return ordered[:8]
+
+
+def _linkedin_skills_to_feature(
+    *,
+    verified_skills: list[str],
+    source_skills: list[str],
+    matched: list[str],
+    alternate: bool = False,
+) -> list[str]:
+    verified_lookup = {skill.lower(): skill for skill in verified_skills}
+    priority_terms = (
+        matched + source_skills if alternate else source_skills + matched
+    )
+    ordered: list[str] = []
+    for term in priority_terms:
+        key = term.lower()
+        if key in verified_lookup and verified_lookup[key] not in ordered:
+            ordered.append(verified_lookup[key])
+    for skill in verified_skills:
+        if skill not in ordered:
+            ordered.append(skill)
+    return ordered[:20]
 
 
 def _keyword_recommendations(

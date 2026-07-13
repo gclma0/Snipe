@@ -142,6 +142,32 @@ class LearningPlanResult(BaseModel):
     cached: bool = False
 
 
+class LinkedInExperienceRecommendation(BaseModel):
+    section: str
+    recommendation: str
+    evidence_to_use: list[str] = Field(default_factory=list, max_length=6)
+    missing_evidence_warning: str | None = None
+
+
+class LinkedInOptimizationResult(BaseModel):
+    output_type: str = "ai_linkedin_optimization"
+    output_version: str = "ai-linkedin-optimization-v1"
+    provider: str
+    model_name: str
+    summary: str
+    headline_options: list[str] = Field(default_factory=list, max_length=5)
+    about_section: str
+    experience_recommendations: list[LinkedInExperienceRecommendation] = Field(
+        default_factory=list,
+        max_length=6,
+    )
+    skills_to_feature: list[str] = Field(default_factory=list, max_length=20)
+    profile_checklist: list[str] = Field(default_factory=list, max_length=10)
+    missing_evidence_warnings: list[str] = Field(default_factory=list, max_length=8)
+    cautions: list[str] = Field(default_factory=list, max_length=5)
+    cached: bool = False
+
+
 class ApplicationMaterialsResult(BaseModel):
     output_type: str = "ai_application_materials"
     output_version: str = "ai-application-materials-v1"

@@ -179,9 +179,11 @@ Phase 2. Rewrites selected resume bullets.
 
 Phase 2. Generates or improves profile summaries.
 
-### POST `/profiles/{profile_id}/ai/linkedin`
+### POST `/profiles/{profile_id}/ai/linkedin-optimization`
 
-Phase 2. Generates requested LinkedIn sections.
+Phase 2. Generates evidence-bound LinkedIn headline options, About section,
+experience recommendations, skills-to-feature list, profile checklist, and
+missing-evidence warnings.
 
 ### POST `/profiles/{profile_id}/ai/application-materials`
 

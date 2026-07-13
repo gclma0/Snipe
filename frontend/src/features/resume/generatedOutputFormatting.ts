@@ -12,6 +12,7 @@ export function formatOutputType(outputType: string) {
     mvp_basic_report: "Basic report",
     ai_project_roadmap_recommendations: "Project roadmap",
     ai_learning_plan: "Learning plan",
+    ai_linkedin_optimization: "LinkedIn optimization",
     ai_application_materials: "Application materials",
     full_career_report: "Full report",
   };

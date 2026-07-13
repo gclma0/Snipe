@@ -30,6 +30,7 @@ type ResumeActionsPanelProps = {
   onCreateCareerTransition: () => void;
   onCreateProjectRoadmap: (forceRegenerate?: boolean) => void;
   onCreateLearningPlan: (forceRegenerate?: boolean) => void;
+  onCreateLinkedInOptimization: (forceRegenerate?: boolean) => void;
   onCreateApplicationMaterials: (forceRegenerate?: boolean) => void;
 };
 
@@ -53,6 +54,7 @@ export function ResumeActionsPanel({
   onCreateCareerTransition,
   onCreateProjectRoadmap,
   onCreateLearningPlan,
+  onCreateLinkedInOptimization,
   onCreateApplicationMaterials,
 }: ResumeActionsPanelProps) {
   return (
@@ -165,6 +167,14 @@ export function ResumeActionsPanel({
           <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onCreateLearningPlan(true)}>
             <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
             Regenerate plan
+          </button>
+          <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onCreateLinkedInOptimization(false)}>
+            <MessageSquare aria-hidden="true" className="h-4 w-4" />
+            LinkedIn optimization
+          </button>
+          <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onCreateLinkedInOptimization(true)}>
+            <MessageSquare aria-hidden="true" className="h-4 w-4" />
+            Regenerate LinkedIn
           </button>
           <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => onCreateApplicationMaterials(false)}>
             <ScrollText aria-hidden="true" className="h-4 w-4" />

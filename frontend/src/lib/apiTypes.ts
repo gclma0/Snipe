@@ -381,6 +381,29 @@ export type LearningPlanResult = {
   cached: boolean;
 };
 
+export type LinkedInExperienceRecommendation = {
+  section: string;
+  recommendation: string;
+  evidence_to_use: string[];
+  missing_evidence_warning: string | null;
+};
+
+export type LinkedInOptimizationResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  headline_options: string[];
+  about_section: string;
+  experience_recommendations: LinkedInExperienceRecommendation[];
+  skills_to_feature: string[];
+  profile_checklist: string[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ApplicationMaterialsResult = {
   output_type: string;
   output_version: string;

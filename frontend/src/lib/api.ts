@@ -36,6 +36,8 @@ export type {
   ProjectRoadmapResult,
   LearningPlanStep,
   LearningPlanResult,
+  LinkedInExperienceRecommendation,
+  LinkedInOptimizationResult,
   ApplicationMaterialsResult,
   JobMatch,
   JobMatchResult,
@@ -76,6 +78,7 @@ import type {
   CareerTransitionResult,
   ProjectRoadmapResult,
   LearningPlanResult,
+  LinkedInOptimizationResult,
   ApplicationMaterialsResult,
   JobMatchResult,
   SavedJobMatchRun,
@@ -450,6 +453,28 @@ export function createLearningPlan(
 ) {
   return request<LearningPlanResult>(
     `/profiles/${profileId}/ai/learning-plan`,
+    token,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        job_description_id: jobDescriptionId ?? null,
+        force_regenerate: forceRegenerate,
+      }),
+    },
+  );
+}
+
+export function createLinkedInOptimization(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+  forceRegenerate = false,
+) {
+  return request<LinkedInOptimizationResult>(
+    `/profiles/${profileId}/ai/linkedin-optimization`,
     token,
     {
       method: "POST",

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.ai.application_materials import build_application_materials_context
 from app.ai.context import build_ai_interpretation_context
 from app.ai.interview import build_interview_prep_context
+from app.ai.linkedin_optimization import build_linkedin_optimization_context
 from app.ai.llm import (
     AIClient,
     AIInterpretationResult,
@@ -16,6 +17,8 @@ from app.ai.llm import (
     KeywordInsertionRecommendation,
     LearningPlanResult,
     LearningPlanStep,
+    LinkedInExperienceRecommendation,
+    LinkedInOptimizationResult,
     ProjectRecommendation,
     ProjectRoadmapResult,
     ResumeRewriteResult,
@@ -45,6 +48,7 @@ class FakeAIClient:
     interview_prompts: list[dict[str, Any]] = []
     roadmap_prompts: list[dict[str, Any]] = []
     learning_plan_prompts: list[dict[str, Any]] = []
+    linkedin_prompts: list[dict[str, Any]] = []
     application_prompts: list[dict[str, Any]] = []
 
     def __init__(self, settings: Settings) -> None:
@@ -229,6 +233,32 @@ class FakeAIClient:
             cautions=["Do not invent unsupported application claims."],
         )
 
+    def generate_linkedin_optimization(
+        self,
+        context: dict[str, Any],
+    ) -> LinkedInOptimizationResult:
+        self.linkedin_prompts.append(context)
+        return LinkedInOptimizationResult(
+            provider="fake",
+            model_name="fake-model",
+            summary="LinkedIn optimization is evidence-bound.",
+            headline_options=["Operations Analyst with verified Excel and SQL"],
+            about_section="About section with verified operations evidence.",
+            experience_recommendations=[
+                LinkedInExperienceRecommendation(
+                    section="About",
+                    recommendation="Use verified Excel and SQL evidence.",
+                    evidence_to_use=["excel", "sql", "operations"],
+                )
+            ],
+            skills_to_feature=["excel", "sql", "operations"],
+            profile_checklist=["Keep LinkedIn claims evidence-bound."],
+            missing_evidence_warnings=[
+                "Add communication only if supported by real evidence."
+            ],
+            cautions=["Do not invent unsupported LinkedIn claims."],
+        )
+
 
 @dataclass
 class FakeSupabaseClient:
@@ -289,6 +319,11 @@ def normalized_profile() -> dict[str, Any]:
             {"name": "project management", "source": "resume"},
         ],
         "optional_sources": {
+            "linkedin": {
+                "headline": "Operations Analyst | Excel and SQL",
+                "skill_signals": ["excel", "sql", "operations"],
+                "experience_items": ["Operations Analyst - Led reporting workflows."],
+            },
             "portfolio": {
                 "technical_signals": [],
                 "non_technical_signals": ["operations", "strategy"],
@@ -331,6 +366,7 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
     FakeAIClient.interview_prompts = []
     FakeAIClient.roadmap_prompts = []
     FakeAIClient.learning_plan_prompts = []
+    FakeAIClient.linkedin_prompts = []
     FakeAIClient.application_prompts = []
     monkeypatch.setattr(ai_route, "AIClient", FakeAIClient)
     app = create_app(Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET))
@@ -666,6 +702,60 @@ def test_local_learning_plan_warns_about_missing_evidence() -> None:
     assert result.daily_plan[0].cadence == "daily"
     assert "no verified skills" in result.missing_evidence_warnings[0].lower()
     assert "planned learning" in result.cautions[0].lower()
+
+
+def test_linkedin_optimization_context_excludes_raw_resume_sections() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_linkedin_optimization_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(context)
+    assert len(context["experience_signals"]) <= 5
+    assert context["context_version"] == "ai-linkedin-optimization-context-v1"
+    assert context["verified_skills"] == ["excel", "operations", "project management", "sql"]
+    assert context["linkedin_source"]["headline"] == "Operations Analyst | Excel and SQL"
+
+
+def test_local_linkedin_optimization_warns_about_missing_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_linkedin_optimization_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_linkedin_optimization(context)
+
+    assert "limited" in result.summary.lower()
+    assert result.headline_options
+    assert "Helped the team complete weekly work" in result.about_section
+    assert "no verified skills" in result.missing_evidence_warnings[0].lower()
+    assert "do not add linkedin skills" in result.cautions[0].lower()
+
+
+def test_local_linkedin_optimization_alternate_mode_changes_about_section() -> None:
+    readiness = build_readiness_dashboard(normalized_profile(), structured_job())
+    context = build_linkedin_optimization_context(
+        normalized_profile=normalized_profile(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_linkedin_optimization(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_linkedin_optimization(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.about_section != alternate_result.about_section
 
 
 def test_application_materials_context_excludes_raw_resume_sections() -> None:
@@ -1202,6 +1292,120 @@ def test_learning_plan_endpoint_generates_and_persists(monkeypatch) -> None:
     assert body["daily_plan"][0]["title"] == "Daily SQL practice"
     assert fake.outputs[0]["output_type"] == "ai_learning_plan"
     assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.learning_plan_prompts[0])
+
+
+def test_linkedin_optimization_endpoint_generates_and_persists(monkeypatch) -> None:
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/linkedin-optimization",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["provider"] == "fake"
+    assert body["headline_options"][0] == "Operations Analyst with verified Excel and SQL"
+    assert fake.outputs[0]["output_type"] == "ai_linkedin_optimization"
+    assert "RAW_UNIQUE_RESUME_PHRASE" not in str(FakeAIClient.linkedin_prompts[0])
+
+
+def test_linkedin_optimization_endpoint_returns_cached_output(monkeypatch) -> None:
+    cached_result = LinkedInOptimizationResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached LinkedIn optimization.",
+        headline_options=[],
+        about_section="Cached about.",
+        experience_recommendations=[],
+        skills_to_feature=[],
+        profile_checklist=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/linkedin-optimization",
+        json={"job_description_id": TEST_JOB_ID},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is True
+    assert response.json()["summary"] == "Cached LinkedIn optimization."
+    assert fake.outputs == []
+    assert FakeAIClient.linkedin_prompts == []
+
+
+def test_linkedin_optimization_force_regenerate_bypasses_cached_output(monkeypatch) -> None:
+    cached_result = LinkedInOptimizationResult(
+        provider="fake",
+        model_name="fake-model",
+        summary="Cached LinkedIn optimization.",
+        headline_options=[],
+        about_section="Cached about.",
+        experience_recommendations=[],
+        skills_to_feature=[],
+        profile_checklist=[],
+        missing_evidence_warnings=[],
+        cautions=[],
+    )
+    fake = FakeSupabaseClient(
+        profile={
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "version": 4,
+            "normalized_json": normalized_profile(),
+        },
+        job_description={
+            "id": TEST_JOB_ID,
+            "profile_id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "structured_json": structured_job(),
+        },
+        cached_output={"result_json": cached_result.model_dump(exclude={"cached"})},
+    )
+    client = client_with_fake_supabase(fake, monkeypatch)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/ai/linkedin-optimization",
+        json={"job_description_id": TEST_JOB_ID, "force_regenerate": True},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["cached"] is False
+    assert response.json()["summary"] == "LinkedIn optimization is evidence-bound."
+    assert fake.outputs
+    assert FakeAIClient.linkedin_prompts[0]["generation_mode"] == "alternate"
 
 
 def test_project_roadmap_endpoint_returns_cached_output(monkeypatch) -> None:

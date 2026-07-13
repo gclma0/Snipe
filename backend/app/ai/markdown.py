@@ -6,6 +6,7 @@ from app.ai.schemas import (
     ApplicationMaterialsResult,
     InterviewPrepResult,
     LearningPlanResult,
+    LinkedInOptimizationResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
@@ -234,6 +235,45 @@ def learning_plan_markdown(result: LearningPlanResult) -> str:
                     "",
                 ]
             )
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence Warnings")
+        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {caution}" for caution in result.cautions)
+    return "\n".join(lines)
+
+
+def linkedin_optimization_markdown(result: LinkedInOptimizationResult) -> str:
+    lines = ["# Snipe LinkedIn Optimization", "", result.summary, ""]
+    if result.headline_options:
+        lines.append("## Headline Options")
+        lines.extend(f"- {item}" for item in result.headline_options)
+        lines.append("")
+    lines.extend(["## About Section", result.about_section, ""])
+    if result.experience_recommendations:
+        lines.append("## Experience Recommendations")
+        for item in result.experience_recommendations:
+            lines.extend(
+                [
+                    f"### {item.section}",
+                    item.recommendation,
+                    "Evidence to use:",
+                    *[f"- {evidence}" for evidence in item.evidence_to_use],
+                    "",
+                ]
+            )
+            if item.missing_evidence_warning:
+                lines.extend(["Missing evidence:", f"- {item.missing_evidence_warning}", ""])
+    if result.skills_to_feature:
+        lines.append("## Skills To Feature")
+        lines.extend(f"- {skill}" for skill in result.skills_to_feature)
+        lines.append("")
+    if result.profile_checklist:
+        lines.append("## Profile Checklist")
+        lines.extend(f"- {item}" for item in result.profile_checklist)
+        lines.append("")
     if result.missing_evidence_warnings:
         lines.append("## Missing Evidence Warnings")
         lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)

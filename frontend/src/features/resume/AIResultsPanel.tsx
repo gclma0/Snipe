@@ -9,6 +9,7 @@ import {
   CareerTransitionResult,
   ClaimVerificationResult,
   InterviewPrepResult,
+  LinkedInOptimizationResult,
   LearningPlanResult,
   LearningPlanStep,
   MockInterviewSession,
@@ -31,6 +32,7 @@ type AIResultsPanelProps = {
   careerTransitionResult: CareerTransitionResult | null;
   projectRoadmapResult: ProjectRoadmapResult | null;
   learningPlanResult: LearningPlanResult | null;
+  linkedInOptimizationResult: LinkedInOptimizationResult | null;
   applicationMaterialsResult: ApplicationMaterialsResult | null;
   isBusy: boolean;
   onMockInterviewAnswerChange: (value: string) => void;
@@ -50,6 +52,7 @@ export function AIResultsPanel({
   careerTransitionResult,
   projectRoadmapResult,
   learningPlanResult,
+  linkedInOptimizationResult,
   applicationMaterialsResult,
   isBusy,
   onMockInterviewAnswerChange,
@@ -407,6 +410,46 @@ export function AIResultsPanel({
           {learningPlanResult.cautions.length ? (
             <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
               {learningPlanResult.cautions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+      {linkedInOptimizationResult ? (
+        <div className="mt-5 border-t border-border pt-5 text-sm">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-base font-semibold">LinkedIn optimization</h3>
+            <p className="text-xs text-muted-foreground">{linkedInOptimizationResult.cached ? "Cached" : linkedInOptimizationResult.provider}</p>
+          </div>
+          <p className="mt-2 text-muted-foreground">{linkedInOptimizationResult.summary}</p>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+            <JobField label="Headline options" values={linkedInOptimizationResult.headline_options} />
+            <JobField label="Skills to feature" values={linkedInOptimizationResult.skills_to_feature} />
+            <JobField label="Profile checklist" values={linkedInOptimizationResult.profile_checklist} />
+            <JobField label="Missing evidence" values={linkedInOptimizationResult.missing_evidence_warnings.slice(0, 6)} />
+          </dl>
+          <div className="mt-4 border border-border p-3">
+            <p className="font-medium">About section</p>
+            <p className="mt-2 text-muted-foreground">{linkedInOptimizationResult.about_section}</p>
+          </div>
+          {linkedInOptimizationResult.experience_recommendations.length ? (
+            <div className="mt-4 grid gap-3">
+              {linkedInOptimizationResult.experience_recommendations.map((item) => (
+                <div key={`${item.section}-${item.recommendation}`} className="border border-border p-3">
+                  <p className="font-medium">{item.section}</p>
+                  <p className="mt-2 text-muted-foreground">{item.recommendation}</p>
+                  <JobField label="Evidence to use" values={item.evidence_to_use} />
+                  {item.missing_evidence_warning ? (
+                    <p className="mt-2 text-muted-foreground">{item.missing_evidence_warning}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {linkedInOptimizationResult.cautions.length ? (
+            <ul className="mt-4 list-disc space-y-1 pl-5 text-muted-foreground">
+              {linkedInOptimizationResult.cautions.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>

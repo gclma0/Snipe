@@ -200,6 +200,8 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Regenerate roadmap/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Learning plan$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate plan/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^LinkedIn optimization$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Regenerate LinkedIn/i })).toBeInTheDocument();
   });
 
   it("renders saved-output filters and management controls after history loads", async () => {
@@ -708,6 +710,72 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("Weekly dashboard proof")).toBeInTheDocument();
     expect(screen.getByText("Monthly portfolio artifact")).toBeInTheDocument();
     expect(screen.getByText("Do not present planned learning as completed.")).toBeInTheDocument();
+  });
+
+  it("renders generated LinkedIn optimization", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        output_type: "ai_linkedin_optimization",
+        output_version: "ai-linkedin-optimization-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        summary: "LinkedIn optimization generated from verified profile signals.",
+        headline_options: ["Operations Analyst with verified Excel and SQL"],
+        about_section: "Evidence-bound About section for Operations Analyst roles.",
+        experience_recommendations: [
+          {
+            section: "About",
+            recommendation: "Use verified Excel and SQL evidence.",
+            evidence_to_use: ["excel", "sql"],
+            missing_evidence_warning: null,
+          },
+        ],
+        skills_to_feature: ["excel", "sql", "operations"],
+        profile_checklist: ["Keep LinkedIn claims evidence-bound."],
+        missing_evidence_warnings: ["Add communication only if supported by real evidence."],
+        cautions: ["Do not invent unsupported LinkedIn claims."],
+        cached: false,
+      },
+      [],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /^LinkedIn optimization$/i }));
+
+    expect(await screen.findByText("LinkedIn optimization generated from verified profile signals.")).toBeInTheDocument();
+    expect(screen.getByText("Operations Analyst with verified Excel and SQL")).toBeInTheDocument();
+    expect(screen.getByText("Evidence-bound About section for Operations Analyst roles.")).toBeInTheDocument();
+    expect(screen.getByText("Use verified Excel and SQL evidence.")).toBeInTheDocument();
+    expect(screen.getByText("Do not invent unsupported LinkedIn claims.")).toBeInTheDocument();
   });
 
   it("renders deterministic job matches", async () => {

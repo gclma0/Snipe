@@ -19,6 +19,10 @@ from app.ai.claim_verification import (
 )
 from app.ai.context import ai_context_hash, build_ai_interpretation_context
 from app.ai.interview import build_interview_prep_context, interview_context_hash
+from app.ai.linkedin_optimization import (
+    build_linkedin_optimization_context,
+    linkedin_optimization_context_hash,
+)
 from app.ai.llm import AIClient
 from app.ai.markdown import (
     application_materials_markdown,
@@ -27,6 +31,7 @@ from app.ai.markdown import (
     interpretation_markdown,
     interview_markdown,
     learning_plan_markdown,
+    linkedin_optimization_markdown,
     outreach_markdown,
     project_roadmap_markdown,
     rewrite_markdown,
@@ -51,6 +56,7 @@ from app.ai.schemas import (
     ApplicationMaterialsResult,
     InterviewPrepResult,
     LearningPlanResult,
+    LinkedInOptimizationResult,
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
@@ -77,6 +83,8 @@ PROJECT_ROADMAP_OUTPUT_TYPE = "ai_project_roadmap_recommendations"
 PROJECT_ROADMAP_PROMPT_VERSION = "ai-project-roadmap-v1"
 LEARNING_PLAN_OUTPUT_TYPE = "ai_learning_plan"
 LEARNING_PLAN_PROMPT_VERSION = "ai-learning-plan-v1"
+LINKEDIN_OPTIMIZATION_OUTPUT_TYPE = "ai_linkedin_optimization"
+LINKEDIN_OPTIMIZATION_PROMPT_VERSION = "ai-linkedin-optimization-v1"
 APPLICATION_MATERIALS_OUTPUT_TYPE = "ai_application_materials"
 APPLICATION_MATERIALS_PROMPT_VERSION = "ai-application-materials-v1"
 CLAIM_VERIFICATION_OUTPUT_TYPE = "ai_claim_verification_questions"
@@ -774,6 +782,86 @@ def create_learning_plan(
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
                 "result_markdown": learning_plan_markdown(result),
+                "status": "completed",
+            }
+        )
+    except AIProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+
+    return result
+
+
+@router.post(
+    "/linkedin-optimization",
+    response_model=LinkedInOptimizationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_linkedin_optimization(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> LinkedInOptimizationResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating LinkedIn optimization.",
+            )
+
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_linkedin_optimization_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = linkedin_optimization_context_hash(context)
+        if not force_regenerate:
+            cached = supabase.get_generated_output(
+                user_id=user.id,
+                profile_id=profile_id,
+                output_type=LINKEDIN_OPTIMIZATION_OUTPUT_TYPE,
+                input_hash=input_hash,
+                job_description_id=job_description_id,
+            )
+            if cached is not None:
+                result = LinkedInOptimizationResult(**(cached.get("result_json") or {}))
+                result.cached = True
+                return result
+
+        result = AIClient(supabase.settings).generate_linkedin_optimization(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": LINKEDIN_OPTIMIZATION_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": LINKEDIN_OPTIMIZATION_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": linkedin_optimization_markdown(result),
                 "status": "completed",
             }
         )

@@ -40,6 +40,7 @@ import {
   JobMatchResult,
   SavedJobMatchRun,
   LearningPlanResult,
+  LinkedInOptimizationResult,
   LinkedInSourceResult,
   MockInterviewSession,
   OutreachMessagePack,
@@ -68,6 +69,7 @@ import {
   createFullReport,
   createInterviewPrep,
   createLearningPlan,
+  createLinkedInOptimization,
   createOutreachMessagePack,
   createJobDescription,
   createProjectRoadmap,
@@ -136,6 +138,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [careerTransitionResult, setCareerTransitionResult] = useState<CareerTransitionResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [learningPlanResult, setLearningPlanResult] = useState<LearningPlanResult | null>(null);
+  const [linkedInOptimizationResult, setLinkedInOptimizationResult] = useState<LinkedInOptimizationResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentSummary[]>([]);
@@ -241,6 +244,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -298,6 +302,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs(outputs);
       setGeneratedOutputFilter("all");
@@ -338,6 +343,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -369,6 +375,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setCareerTransitionResult(null);
     setProjectRoadmapResult(null);
     setLearningPlanResult(null);
+    setLinkedInOptimizationResult(null);
     setApplicationMaterialsResult(null);
     setSelectedGeneratedOutput(null);
     setMessage(selected ? "Saved target job selected." : "Target job selection cleared.");
@@ -405,6 +412,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setSelectedGeneratedOutput(null);
       return existingTarget;
@@ -440,6 +448,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setCareerTransitionResult(null);
     setProjectRoadmapResult(null);
     setLearningPlanResult(null);
+    setLinkedInOptimizationResult(null);
     setApplicationMaterialsResult(null);
     setSelectedGeneratedOutput(null);
     return result;
@@ -614,6 +623,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -664,6 +674,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
@@ -1173,6 +1184,34 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleCreateLinkedInOptimization(forceRegenerate = false) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel(forceRegenerate ? "Regenerating LinkedIn optimization..." : "Generating LinkedIn optimization...");
+    setMessage(null);
+    try {
+      const result = await createLinkedInOptimization(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
+      setLinkedInOptimizationResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(
+        result.cached ? "LinkedIn optimization loaded from cache." : "LinkedIn optimization generated.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate LinkedIn optimization.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
   async function handleRunDashboard() {
     if (!accessToken || !profile) {
       return;
@@ -1525,6 +1564,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onCreateFullReport={handleCreateFullReport}
             onCreateInterviewPrep={handleCreateInterviewPrep}
             onCreateLearningPlan={handleCreateLearningPlan}
+            onCreateLinkedInOptimization={handleCreateLinkedInOptimization}
             onCreateOutreachPack={handleCreateOutreachPack}
             onCreateProjectRoadmap={handleCreateProjectRoadmap}
             onCreateReport={handleCreateReport}
@@ -1636,6 +1676,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             interviewResult={interviewResult}
             isBusy={isBusy}
             learningPlanResult={learningPlanResult}
+            linkedInOptimizationResult={linkedInOptimizationResult}
             mockInterviewAnswer={mockInterviewAnswer}
             mockInterviewEvaluation={mockInterviewEvaluation}
             mockInterviewSession={mockInterviewSession}

@@ -22,6 +22,7 @@ const outputTypeFilters = [
   { value: "ai_career_transition_analysis", label: "Career transition" },
   { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
   { value: "ai_learning_plan", label: "Learning plans" },
+  { value: "ai_linkedin_optimization", label: "LinkedIn optimization" },
   { value: "ai_application_materials", label: "Application materials" },
   { value: "full_career_report", label: "Full reports" },
 ] as const;

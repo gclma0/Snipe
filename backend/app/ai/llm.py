@@ -241,6 +241,7 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
     bullets = context.get("existing_bullets") or []
     verified_skills = context.get("verified_skills") or []
     skill_gap = context.get("skill_gap") or {}
+    generation_mode = context.get("generation_mode")
     matched = set(skill_gap.get("matched") or [])
     target_job = context.get("target_job") or {}
     target_keywords = []
@@ -261,7 +262,11 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
             matched=matched,
             target_keywords=target_keywords,
         )
-        suggested, needs_candidate_value = _rewrite_bullet(bullet, evidence)
+        suggested, needs_candidate_value = _rewrite_bullet(
+            bullet,
+            evidence,
+            alternate=generation_mode == "alternate",
+        )
         suggestions.append(
             ResumeRewriteSuggestion(
                 original=bullet,
@@ -314,11 +319,22 @@ def _rewrite_evidence(
     return matched_verified[:3] or target_verified[:3] or verified_skills[:3]
 
 
-def _rewrite_bullet(bullet: str, evidence: list[str]) -> tuple[str, bool]:
+def _rewrite_bullet(
+    bullet: str,
+    evidence: list[str],
+    *,
+    alternate: bool = False,
+) -> tuple[str, bool]:
     cleaned = bullet.strip().rstrip(".")
     if evidence:
         evidence_text = ", ".join(evidence[:3])
-        suggested = f"{cleaned}; emphasized verified strengths in {evidence_text}."
+        if alternate:
+            suggested = (
+                f"Applied {evidence_text} to support this work: {cleaned[0].lower()}"
+                f"{cleaned[1:]}."
+            )
+        else:
+            suggested = f"{cleaned}; emphasized verified strengths in {evidence_text}."
         if suggested.lower() != bullet.strip().lower():
             return suggested, False
     return (

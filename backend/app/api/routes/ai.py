@@ -138,8 +138,10 @@ def create_resume_rewrite_suggestions(
             readiness=readiness,
             structured_job=structured_job,
         )
-        input_hash = rewrite_context_hash(context)
         force_regenerate = bool(payload.force_regenerate) if payload else False
+        if force_regenerate:
+            context["generation_mode"] = "alternate"
+        input_hash = rewrite_context_hash(context)
         if not force_regenerate:
             cached = supabase.get_generated_output(
                 user_id=user.id,

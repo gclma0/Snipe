@@ -72,6 +72,8 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Claim questions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate claims/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Mock interview/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Outreach messages/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Career transition/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Project roadmap$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate roadmap/i })).toBeInTheDocument();
   });

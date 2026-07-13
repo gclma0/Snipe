@@ -285,6 +285,43 @@ export type MockInterviewTurnResult = {
   next_question: MockInterviewQuestion | null;
 };
 
+export type OutreachMessagePack = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  linkedin_connection_message: string;
+  recruiter_outreach_message: string;
+  job_application_email: string;
+  follow_up_email: string;
+  interview_thank_you_email: string;
+  referral_request: string;
+  short_professional_intro: string;
+  evidence_used: string[];
+  missing_evidence_warnings: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
+export type CareerTransitionResult = {
+  output_type: string;
+  output_version: string;
+  provider: string;
+  model_name: string;
+  summary: string;
+  transferable_skills: string[];
+  reframed_experience: string[];
+  missing_foundational_knowledge: string[];
+  transitional_roles: string[];
+  recommended_projects: string[];
+  learning_sequence: string[];
+  resume_positioning: string[];
+  likely_interview_concerns: string[];
+  cautions: string[];
+  cached: boolean;
+};
+
 export type ProjectRecommendation = {
   title: string;
   objective: string;
@@ -687,6 +724,34 @@ export function evaluateInterviewAnswer(
       evidence_to_use: payload.evidence_to_use ?? [],
       category: payload.category ?? null,
     }),
+  });
+}
+
+export function createOutreachMessagePack(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+) {
+  return request<OutreachMessagePack>(`/profiles/${profileId}/ai/outreach-message-pack`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function createCareerTransitionAnalysis(
+  token: string,
+  profileId: string,
+  jobDescriptionId?: string | null,
+) {
+  return request<CareerTransitionResult>(`/profiles/${profileId}/ai/career-transition-analysis`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
   });
 }
 

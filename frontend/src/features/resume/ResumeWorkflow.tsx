@@ -28,6 +28,7 @@ import {
   AIInterpretationResult,
   ApplicationMaterialsResult,
   AnswerEvaluationResult,
+  CareerTransitionResult,
   CandidateProfile,
   ClaimVerificationResult,
   DeterministicScoreResult,
@@ -38,6 +39,7 @@ import {
   JobMatchResult,
   LinkedInSourceResult,
   MockInterviewSession,
+  OutreachMessagePack,
   PortfolioSourceResult,
   ProjectRoadmapResult,
   ReadinessDashboardResult,
@@ -53,8 +55,10 @@ import {
   createAIReadinessInterpretation,
   createApplicationMaterials,
   createBasicReport,
+  createCareerTransitionAnalysis,
   createClaimVerificationQuestions,
   createInterviewPrep,
+  createOutreachMessagePack,
   createJobDescription,
   createProjectRoadmap,
   createResumeRewriteSuggestions,
@@ -114,6 +118,8 @@ const outputTypeFilters = [
   { value: "ai_resume_tailoring_package", label: "Tailoring packages" },
   { value: "ai_interview_prep", label: "Interview prep" },
   { value: "ai_claim_verification_questions", label: "Claim questions" },
+  { value: "ai_outreach_message_pack", label: "Outreach messages" },
+  { value: "ai_career_transition_analysis", label: "Career transition" },
   { value: "ai_project_roadmap_recommendations", label: "Project roadmaps" },
   { value: "ai_application_materials", label: "Application materials" },
 ] as const;
@@ -140,6 +146,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [mockInterviewSession, setMockInterviewSession] = useState<MockInterviewSession | null>(null);
   const [mockInterviewEvaluation, setMockInterviewEvaluation] = useState<AnswerEvaluationResult | null>(null);
   const [mockInterviewAnswer, setMockInterviewAnswer] = useState("");
+  const [outreachResult, setOutreachResult] = useState<OutreachMessagePack | null>(null);
+  const [careerTransitionResult, setCareerTransitionResult] = useState<CareerTransitionResult | null>(null);
   const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
@@ -218,6 +226,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMockInterviewSession(null);
       setMockInterviewEvaluation(null);
       setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -253,6 +263,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMockInterviewSession(null);
       setMockInterviewEvaluation(null);
       setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -369,6 +381,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMockInterviewSession(null);
       setMockInterviewEvaluation(null);
       setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -413,6 +427,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMockInterviewSession(null);
       setMockInterviewEvaluation(null);
       setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
       setProjectRoadmapResult(null);
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
@@ -721,6 +737,48 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(result.session.status === "completed" ? "Mock interview completed." : "Answer evaluated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not evaluate answer.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateOutreachPack() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Generating outreach messages...");
+    setMessage(null);
+    try {
+      const result = await createOutreachMessagePack(accessToken, profile.id, jobResult?.id ?? null);
+      setOutreachResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(result.cached ? "Outreach messages loaded from cache." : "Outreach messages generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate outreach messages.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleCreateCareerTransition() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Generating career transition analysis...");
+    setMessage(null);
+    try {
+      const result = await createCareerTransitionAnalysis(accessToken, profile.id, jobResult?.id ?? null);
+      setCareerTransitionResult(result);
+      await refreshGeneratedOutputs(accessToken, profile.id);
+      setMessage(result.cached ? "Career transition loaded from cache." : "Career transition generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate career transition analysis.");
     } finally {
       setIsBusy(false);
       setBusyLabel(null);
@@ -1105,6 +1163,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleStartMockInterview}>
                       <MessageSquare aria-hidden="true" className="h-4 w-4" />
                       Mock interview
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateOutreachPack}>
+                      <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                      Outreach messages
+                    </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateCareerTransition}>
+                      <GitCompareArrows aria-hidden="true" className="h-4 w-4" />
+                      Career transition
                     </button>
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCreateProjectRoadmap(false)}>
                       <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
@@ -1606,6 +1672,50 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               ) : null}
             </div>
           ) : null}
+          {outreachResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Outreach messages</h3>
+                <p className="text-xs text-muted-foreground">
+                  {outreachResult.cached ? "Cached" : outreachResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{outreachResult.summary}</p>
+              <div className="mt-4 grid gap-3">
+                <MessageBlock title="LinkedIn connection" value={outreachResult.linkedin_connection_message} />
+                <MessageBlock title="Recruiter outreach" value={outreachResult.recruiter_outreach_message} />
+                <MessageBlock title="Job application email" value={outreachResult.job_application_email} />
+                <MessageBlock title="Follow-up email" value={outreachResult.follow_up_email} />
+                <MessageBlock title="Interview thank-you" value={outreachResult.interview_thank_you_email} />
+                <MessageBlock title="Referral request" value={outreachResult.referral_request} />
+                <MessageBlock title="Professional intro" value={outreachResult.short_professional_intro} />
+              </div>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <JobField label="Evidence used" values={outreachResult.evidence_used} />
+                <JobField label="Missing evidence" values={outreachResult.missing_evidence_warnings} />
+              </dl>
+            </div>
+          ) : null}
+          {careerTransitionResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Career transition</h3>
+                <p className="text-xs text-muted-foreground">
+                  {careerTransitionResult.cached ? "Cached" : careerTransitionResult.provider}
+                </p>
+              </div>
+              <p className="mt-2 text-muted-foreground">{careerTransitionResult.summary}</p>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <JobField label="Transferable skills" values={careerTransitionResult.transferable_skills} />
+                <JobField label="Missing foundations" values={careerTransitionResult.missing_foundational_knowledge} />
+                <JobField label="Transitional roles" values={careerTransitionResult.transitional_roles} />
+                <JobField label="Recommended projects" values={careerTransitionResult.recommended_projects} />
+                <JobField label="Learning sequence" values={careerTransitionResult.learning_sequence} />
+                <JobField label="Resume positioning" values={careerTransitionResult.resume_positioning} />
+                <JobField label="Interview concerns" values={careerTransitionResult.likely_interview_concerns} />
+              </dl>
+            </div>
+          ) : null}
           {projectRoadmapResult ? (
             <div className="mt-5 border-t border-border pt-5 text-sm">
               <div className="flex items-baseline gap-3">
@@ -1725,10 +1835,21 @@ function JobField({ label, values }: { label: string; values: string[] }) {
   );
 }
 
+function MessageBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="border border-border p-3">
+      <p className="font-medium">{title}</p>
+      <pre className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{value}</pre>
+    </div>
+  );
+}
+
 function formatOutputType(outputType: string) {
   const labels: Record<string, string> = {
     ai_interview_prep: "Interview prep",
     ai_claim_verification_questions: "Claim questions",
+    ai_outreach_message_pack: "Outreach messages",
+    ai_career_transition_analysis: "Career transition",
     ai_readiness_interpretation: "AI interpretation",
     ai_resume_rewrite_suggestions: "Rewrite suggestions",
     ai_resume_tailoring_package: "Tailoring package",

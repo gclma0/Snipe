@@ -5,6 +5,12 @@ from app.ai.application_materials import (
     application_materials_context_hash,
     build_application_materials_context,
 )
+from app.ai.career_transition import (
+    CareerTransitionResult,
+    build_career_transition_context,
+    career_transition_context_hash,
+    generate_career_transition_analysis,
+)
 from app.ai.claim_verification import (
     ClaimVerificationResult,
     build_claim_verification_context,
@@ -22,6 +28,12 @@ from app.ai.llm import (
     ProjectRoadmapResult,
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
+)
+from app.ai.outreach import (
+    OutreachMessagePack,
+    build_outreach_context,
+    generate_outreach_message_pack,
+    outreach_context_hash,
 )
 from app.ai.resume_rewrite import build_resume_rewrite_context, rewrite_context_hash
 from app.ai.roadmap import build_project_roadmap_context, project_roadmap_context_hash
@@ -49,6 +61,10 @@ APPLICATION_MATERIALS_OUTPUT_TYPE = "ai_application_materials"
 APPLICATION_MATERIALS_PROMPT_VERSION = "ai-application-materials-v1"
 CLAIM_VERIFICATION_OUTPUT_TYPE = "ai_claim_verification_questions"
 CLAIM_VERIFICATION_PROMPT_VERSION = "ai-claim-verification-v1"
+OUTREACH_OUTPUT_TYPE = "ai_outreach_message_pack"
+OUTREACH_PROMPT_VERSION = "deterministic-outreach-v1"
+CAREER_TRANSITION_OUTPUT_TYPE = "ai_career_transition_analysis"
+CAREER_TRANSITION_PROMPT_VERSION = "deterministic-career-transition-v1"
 
 
 class AIInterpretationRequest(BaseModel):
@@ -453,6 +469,146 @@ def create_claim_verification_questions(
 
 
 @router.post(
+    "/outreach-message-pack",
+    response_model=OutreachMessagePack,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_outreach_message_pack(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> OutreachMessagePack:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating outreach messages.",
+            )
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_outreach_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        input_hash = outreach_context_hash(context)
+        cached = supabase.get_generated_output(
+            user_id=user.id,
+            profile_id=profile_id,
+            output_type=OUTREACH_OUTPUT_TYPE,
+            input_hash=input_hash,
+            job_description_id=job_description_id,
+        )
+        if cached is not None:
+            result = OutreachMessagePack(**(cached.get("result_json") or {}))
+            result.cached = True
+            return result
+        result = generate_outreach_message_pack(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": OUTREACH_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": OUTREACH_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _outreach_markdown(result),
+                "status": "completed",
+            }
+        )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+    return result
+
+
+@router.post(
+    "/career-transition-analysis",
+    response_model=CareerTransitionResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_career_transition_analysis(
+    profile_id: str,
+    payload: AIInterpretationRequest | None = None,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> CareerTransitionResult:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+        normalized_profile = profile.get("normalized_json") or {}
+        if not normalized_profile:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Upload and parse a resume before generating transition analysis.",
+            )
+        job_description_id = payload.job_description_id if payload else None
+        structured_job = _get_structured_job(
+            supabase=supabase,
+            user_id=user.id,
+            profile_id=profile_id,
+            job_description_id=job_description_id,
+        )
+        readiness = build_readiness_dashboard(normalized_profile, structured_job)
+        context = build_career_transition_context(
+            normalized_profile=normalized_profile,
+            readiness=readiness,
+            structured_job=structured_job,
+        )
+        input_hash = career_transition_context_hash(context)
+        cached = supabase.get_generated_output(
+            user_id=user.id,
+            profile_id=profile_id,
+            output_type=CAREER_TRANSITION_OUTPUT_TYPE,
+            input_hash=input_hash,
+            job_description_id=job_description_id,
+        )
+        if cached is not None:
+            result = CareerTransitionResult(**(cached.get("result_json") or {}))
+            result.cached = True
+            return result
+        result = generate_career_transition_analysis(context)
+        supabase.create_generated_output(
+            {
+                "user_id": user.id,
+                "profile_id": profile_id,
+                "output_type": CAREER_TRANSITION_OUTPUT_TYPE,
+                "job_description_id": job_description_id,
+                "input_hash": input_hash,
+                "prompt_version": CAREER_TRANSITION_PROMPT_VERSION,
+                "provider": result.provider,
+                "model_name": result.model_name,
+                "result_json": result.model_dump(exclude={"cached"}),
+                "result_markdown": _career_transition_markdown(result),
+                "status": "completed",
+            }
+        )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+    return result
+
+
+@router.post(
     "/project-roadmap-recommendations",
     response_model=ProjectRoadmapResult,
     status_code=status.HTTP_201_CREATED,
@@ -740,6 +896,54 @@ def _claim_verification_markdown(result: ClaimVerificationResult) -> str:
         lines.append("## Cautions")
         lines.extend(f"- {caution}" for caution in result.cautions)
     return "\n".join(lines)
+
+
+def _outreach_markdown(result: OutreachMessagePack) -> str:
+    lines = ["# Snipe Outreach Message Pack", "", result.summary, ""]
+    sections = [
+        ("LinkedIn Connection Message", result.linkedin_connection_message),
+        ("Recruiter Outreach Message", result.recruiter_outreach_message),
+        ("Job Application Email", result.job_application_email),
+        ("Follow-Up Email", result.follow_up_email),
+        ("Interview Thank-You Email", result.interview_thank_you_email),
+        ("Referral Request", result.referral_request),
+        ("Short Professional Intro", result.short_professional_intro),
+    ]
+    for title, content in sections:
+        lines.extend([f"## {title}", content, ""])
+    if result.evidence_used:
+        lines.append("## Evidence Used")
+        lines.extend(f"- {item}" for item in result.evidence_used)
+        lines.append("")
+    if result.missing_evidence_warnings:
+        lines.append("## Missing Evidence")
+        lines.extend(f"- {item}" for item in result.missing_evidence_warnings)
+        lines.append("")
+    if result.cautions:
+        lines.append("## Cautions")
+        lines.extend(f"- {item}" for item in result.cautions)
+    return "\n".join(lines)
+
+
+def _career_transition_markdown(result: CareerTransitionResult) -> str:
+    lines = ["# Snipe Career Transition Analysis", "", result.summary, ""]
+    sections = [
+        ("Transferable Skills", result.transferable_skills),
+        ("Reframed Experience", result.reframed_experience),
+        ("Missing Foundational Knowledge", result.missing_foundational_knowledge),
+        ("Transitional Roles", result.transitional_roles),
+        ("Recommended Projects", result.recommended_projects),
+        ("Learning Sequence", result.learning_sequence),
+        ("Resume Positioning", result.resume_positioning),
+        ("Likely Interview Concerns", result.likely_interview_concerns),
+        ("Cautions", result.cautions),
+    ]
+    for title, values in sections:
+        if values:
+            lines.append(f"## {title}")
+            lines.extend(f"- {item}" for item in values)
+            lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _project_roadmap_markdown(result: ProjectRoadmapResult) -> str:

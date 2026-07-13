@@ -225,6 +225,26 @@ def test_local_resume_rewrite_alternate_mode_changes_suggestion() -> None:
     assert default_result.suggestions[0].suggested != alternate_result.suggestions[0].suggested
 
 
+def test_local_resume_rewrite_alternate_mode_changes_no_evidence_placeholder() -> None:
+    context = {
+        "existing_bullets": ["Managed weekly reporting updates."],
+        "verified_skills": [],
+        "target_job": None,
+        "skill_gap": None,
+    }
+    default_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_rewrite_suggestions(context)
+
+    alternate_context = {**context, "generation_mode": "alternate"}
+    alternate_result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_rewrite_suggestions(alternate_context)
+
+    assert default_result.summary != alternate_result.summary
+    assert default_result.suggestions[0].suggested != alternate_result.suggestions[0].suggested
+
+
 def test_local_interpretation_alternate_mode_changes_summary() -> None:
     readiness = build_readiness_dashboard(normalized_profile(), structured_job())
     context = build_ai_interpretation_context(

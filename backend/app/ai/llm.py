@@ -325,8 +325,15 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
             ResumeRewriteSuggestion(
                 original="No rewriteable experience bullet was found.",
                 suggested=(
-                    "Add a real experience bullet that demonstrates "
-                    f"{', '.join(verified_skills[:3])}."
+                    (
+                        "Draft a new verified bullet around "
+                        f"{', '.join(verified_skills[:3])}, then add a real scope or result."
+                    )
+                    if generation_mode == "alternate"
+                    else (
+                        "Add a real experience bullet that demonstrates "
+                        f"{', '.join(verified_skills[:3])}."
+                    )
                 ),
                 rationale="Snipe needs an existing fact before it can safely rewrite a bullet.",
                 evidence_used=verified_skills[:3],
@@ -336,7 +343,11 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
     return ResumeRewriteResult(
         provider="local_template",
         model_name="local-template-v1",
-        summary="Rewrite suggestions are based only on compact extracted resume evidence.",
+        summary=(
+            "Regenerated rewrite suggestions use an alternate evidence-bound structure."
+            if generation_mode == "alternate"
+            else "Rewrite suggestions are based only on compact extracted resume evidence."
+        ),
         suggestions=suggestions,
         cautions=[
             (
@@ -379,6 +390,14 @@ def _rewrite_bullet(
         if suggested.lower() != bullet.strip().lower():
             return suggested, False
     return (
-        f"{cleaned}; add a true outcome or scope detail such as [candidate-supplied result].",
+        (
+            "Reframe this bullet with a real scope/result supplied by the candidate: "
+            f"{cleaned}; [candidate-supplied scope or result]."
+            if alternate
+            else (
+                f"{cleaned}; add a true outcome or scope detail such as "
+                "[candidate-supplied result]."
+            )
+        ),
         True,
     )

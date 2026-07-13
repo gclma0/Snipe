@@ -369,6 +369,7 @@ describe("ResumeWorkflow", () => {
     await user.clear(screen.getByLabelText(/^Query$/i));
     await user.type(screen.getByLabelText(/^Query$/i), "python sql analytics");
     await user.selectOptions(screen.getByLabelText(/Reference results/i), "5");
+    await user.click(screen.getByLabelText("Job listing"));
     await user.click(screen.getByRole("button", { name: /Search references/i }));
 
     expect(await screen.findByText("Python SQL analytics dashboards stakeholder reporting.")).toBeInTheDocument();
@@ -384,7 +385,7 @@ describe("ResumeWorkflow", () => {
       expect.stringContaining("/rag/search"),
       expect.objectContaining({
         body: JSON.stringify({
-          source_types: [],
+          source_types: ["job_listing"],
           limit: 5,
           query: "python sql analytics",
         }),

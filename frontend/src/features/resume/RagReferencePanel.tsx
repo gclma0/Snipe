@@ -20,12 +20,14 @@ type RagReferencePanelProps = {
   text: string;
   query: string;
   limit: number;
+  searchSourceTypes: RagSourceType[];
   onTitleChange: (value: string) => void;
   onSourceTypeChange: (value: RagSourceType) => void;
   onSourceUrlChange: (value: string) => void;
   onTextChange: (value: string) => void;
   onQueryChange: (value: string) => void;
   onLimitChange: (value: number) => void;
+  onSearchSourceTypesChange: (value: RagSourceType[]) => void;
   onIngest: () => void;
   onJobSearch: () => void;
   onSearch: () => void;
@@ -42,12 +44,14 @@ export function RagReferencePanel({
   text,
   query,
   limit,
+  searchSourceTypes,
   onTitleChange,
   onSourceTypeChange,
   onSourceUrlChange,
   onTextChange,
   onQueryChange,
   onLimitChange,
+  onSearchSourceTypesChange,
   onIngest,
   onJobSearch,
   onSearch,
@@ -141,6 +145,28 @@ export function RagReferencePanel({
             </select>
           </label>
         </div>
+        <fieldset className="mt-3">
+          <legend className="text-sm font-medium">Search sources</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {sourceTypeOptions.map((item) => (
+              <label key={item.value} className="inline-flex items-center gap-2 text-sm">
+                <input
+                  checked={searchSourceTypes.includes(item.value)}
+                  disabled={isBusy}
+                  type="checkbox"
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      onSearchSourceTypesChange([...searchSourceTypes, item.value]);
+                    } else {
+                      onSearchSourceTypesChange(searchSourceTypes.filter((value) => value !== item.value));
+                    }
+                  }}
+                />
+                {item.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <button
           className="mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium"
           disabled={isBusy}

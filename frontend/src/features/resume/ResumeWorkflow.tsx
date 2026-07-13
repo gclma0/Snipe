@@ -145,6 +145,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [ragText, setRagText] = useState("");
   const [ragQuery, setRagQuery] = useState("");
   const [ragLimit, setRagLimit] = useState(5);
+  const [ragSearchSourceTypes, setRagSearchSourceTypes] = useState<RagSourceType[]>([]);
   const activeTargetLabel = jobResult
     ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
     : null;
@@ -1231,7 +1232,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await searchRagReferences(accessToken, {
         query: ragQuery.trim(),
-        source_types: [],
+        source_types: ragSearchSourceTypes,
         limit: ragLimit,
       });
       setRagSearchResult(result);
@@ -1348,6 +1349,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               limit={ragLimit}
               query={ragQuery}
               searchResult={ragSearchResult}
+              searchSourceTypes={ragSearchSourceTypes}
               sourceType={ragSourceType}
               sourceUrl={ragSourceUrl}
               text={ragText}
@@ -1357,6 +1359,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               onLimitChange={setRagLimit}
               onQueryChange={setRagQuery}
               onSearch={handleSearchRagReferences}
+              onSearchSourceTypesChange={setRagSearchSourceTypes}
               onSourceTypeChange={setRagSourceType}
               onSourceUrlChange={setRagSourceUrl}
               onTextChange={setRagText}

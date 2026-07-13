@@ -591,6 +591,7 @@ describe("ResumeWorkflow", () => {
     await user.click(screen.getByRole("button", { name: /Full report/i }));
 
     expect(await screen.findByText("Snipe Full Career Report: Operations Analyst")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download full report/i })).toBeInTheDocument();
     expect(screen.getByText(/Saved AI Outputs/i)).toBeInTheDocument();
   });
 });

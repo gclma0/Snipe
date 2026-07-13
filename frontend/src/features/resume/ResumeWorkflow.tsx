@@ -636,6 +636,23 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setMessage("Saved output downloaded.");
   }
 
+  function handleDownloadFullReport() {
+    if (!fullReportResult) {
+      return;
+    }
+
+    const blob = new Blob([fullReportResult.markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fullReportFilename(fullReportResult);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage("Full report downloaded.");
+  }
+
   async function handleCreateAIInterpretation(forceRegenerate = false) {
     if (!accessToken || !profile) {
       return;
@@ -1431,6 +1448,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                 <JobField label="Sections included" values={fullReportResult.sections_included.slice(0, 12)} />
               </dl>
+              <button className="mt-4 inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleDownloadFullReport}>
+                <Download aria-hidden="true" className="h-4 w-4" />
+                Download full report
+              </button>
               <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
                 {fullReportResult.markdown}
               </pre>
@@ -2001,6 +2022,11 @@ function generatedOutputFilename(output: GeneratedOutput) {
       : "saved-output";
   const typePart = output.output_type.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
   return `snipe-${typePart || "output"}-${datePart}.md`.toLowerCase();
+}
+
+function fullReportFilename(report: FullCareerReportResult) {
+  const titlePart = report.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+  return `snipe-${titlePart || "full-career-report"}.md`.toLowerCase();
 }
 
 function formatRoadmapTimeframe(value: string) {

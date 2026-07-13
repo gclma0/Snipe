@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -72,7 +72,7 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Regenerate roadmap/i })).toBeInTheDocument();
   });
 
-  it("renders saved-output filters and export controls after history loads", async () => {
+  it("renders saved-output filters and management controls after history loads", async () => {
     const user = userEvent.setup();
     mockFetch([
       {
@@ -124,8 +124,85 @@ describe("ResumeWorkflow", () => {
 
     expect(await screen.findByText("Interview prep summary.")).toBeInTheDocument();
     expect(screen.getByLabelText("Type")).toHaveValue("all");
+    expect(screen.getByRole("button", { name: /View details/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Copy markdown/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download \.md/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Delete$/i })).toBeInTheDocument();
+  });
+
+  it("opens and deletes a saved output", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      [
+        {
+          id: "output-id",
+          output_type: "ai_application_materials",
+          job_description_id: null,
+          prompt_version: "ai-application-materials-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "Application materials summary." },
+          result_markdown: "# Snipe Application Materials",
+          status: "completed",
+          created_at: "2026-07-13T12:00:00Z",
+        },
+      ],
+      {
+        id: "output-id",
+        output_type: "ai_application_materials",
+        job_description_id: null,
+        prompt_version: "ai-application-materials-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        result_json: { summary: "Application materials summary." },
+        result_markdown: "# Snipe Application Materials\n\nCover letter text.",
+        status: "completed",
+        created_at: "2026-07-13T12:00:00Z",
+      },
+      { output_id: "output-id", deleted: true },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /Load history/i }));
+    await user.click(await screen.findByRole("button", { name: /View details/i }));
+
+    expect(await screen.findByText(/Cover letter text/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Delete$/i }));
+
+    await waitFor(() => expect(screen.queryByText("Application materials summary.")).not.toBeInTheDocument());
+    expect(screen.queryByText(/Cover letter text/i)).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("/profiles/profile-id/generated-outputs/output-id"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("renders generated project roadmap recommendations", async () => {

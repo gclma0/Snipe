@@ -541,6 +541,23 @@ export function listGeneratedOutputs(token: string, profileId: string, limit = 2
   );
 }
 
+export function getGeneratedOutput(token: string, profileId: string, outputId: string) {
+  return request<GeneratedOutput>(
+    `/profiles/${profileId}/generated-outputs/${encodeURIComponent(outputId)}`,
+    token,
+  );
+}
+
+export function deleteGeneratedOutput(token: string, profileId: string, outputId: string) {
+  return request<{ output_id: string; deleted: boolean }>(
+    `/profiles/${profileId}/generated-outputs/${encodeURIComponent(outputId)}`,
+    token,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 export function deleteProfileData(token: string, profileId: string) {
   return request<ProfileDeletionResult>(`/profiles/${profileId}/privacy`, token, {
     method: "DELETE",

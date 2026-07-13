@@ -25,6 +25,11 @@ class GeneratedOutputResponse(BaseModel):
     created_at: str | None = None
 
 
+class GeneratedOutputDeletionResponse(BaseModel):
+    output_id: str
+    deleted: bool
+
+
 @router.get("", response_model=list[GeneratedOutputResponse])
 def list_generated_outputs(
     profile_id: str,
@@ -47,3 +52,61 @@ def list_generated_outputs(
             detail="Supabase operation failed.",
         ) from exc
     return [GeneratedOutputResponse(**row) for row in rows]
+
+
+@router.get("/{output_id}", response_model=GeneratedOutputResponse)
+def get_generated_output(
+    profile_id: str,
+    output_id: str,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> GeneratedOutputResponse:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+        row = supabase.get_generated_output_by_id(
+            user_id=user.id,
+            profile_id=profile_id,
+            output_id=output_id,
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Generated output not found.",
+            )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+    return GeneratedOutputResponse(**row)
+
+
+@router.delete("/{output_id}", response_model=GeneratedOutputDeletionResponse)
+def delete_generated_output(
+    profile_id: str,
+    output_id: str,
+    user: AuthenticatedUser = CurrentUser,
+    supabase: SupabaseClient = Supabase,
+) -> GeneratedOutputDeletionResponse:
+    try:
+        profile = supabase.get_candidate_profile(profile_id=profile_id, user_id=user.id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+        deleted = supabase.delete_generated_output(
+            user_id=user.id,
+            profile_id=profile_id,
+            output_id=output_id,
+        )
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Generated output not found.",
+            )
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Supabase operation failed.",
+        ) from exc
+    return GeneratedOutputDeletionResponse(output_id=output_id, deleted=True)

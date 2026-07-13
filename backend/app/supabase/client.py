@@ -272,6 +272,58 @@ class SupabaseClient:
             raise SupabaseError(f"Generated output list failed: {response.text[:300]}")
         return response.json()
 
+    def get_generated_output_by_id(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        output_id: str,
+    ) -> dict[str, Any] | None:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/generated_outputs",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,output_type,job_description_id,prompt_version,provider,"
+                        "model_name,result_json,result_markdown,status,created_at"
+                    ),
+                    "id": f"eq.{output_id}",
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "status": "eq.completed",
+                    "limit": "1",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Generated output fetch failed: {response.text[:300]}")
+        rows = response.json()
+        return rows[0] if rows else None
+
+    def delete_generated_output(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        output_id: str,
+    ) -> bool:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.delete(
+                f"{self.base_url}/rest/v1/generated_outputs",
+                headers={
+                    **self.headers,
+                    "Prefer": "return=representation",
+                },
+                params={
+                    "id": f"eq.{output_id}",
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(f"Generated output delete failed: {response.text[:300]}")
+        return bool(response.json())
+
     def list_profile_storage_paths(self, profile_id: str, user_id: str) -> list[str]:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

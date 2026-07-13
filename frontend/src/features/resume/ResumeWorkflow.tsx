@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Copy,
   Download,
+  Eye,
   FileUp,
   Gauge,
   Github,
@@ -53,7 +54,9 @@ import {
   createResumeRewriteSuggestions,
   createResumeTailoringPackage,
   createProfile,
+  deleteGeneratedOutput,
   deleteProfileData,
+  getGeneratedOutput,
   listGeneratedOutputs,
   runAtsReadinessAnalysis,
   runProfileCompletenessAnalysis,
@@ -127,6 +130,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
+  const [selectedGeneratedOutput, setSelectedGeneratedOutput] = useState<GeneratedOutput | null>(null);
+  const [deletingGeneratedOutputId, setDeletingGeneratedOutputId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
@@ -198,6 +203,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -227,6 +233,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -337,6 +344,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
       setMessage("Resume uploaded and parsed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
@@ -375,6 +383,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setApplicationMaterialsResult(null);
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
@@ -414,6 +423,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await listGeneratedOutputs(accessToken, profile.id);
       setGeneratedOutputs(result);
+      setSelectedGeneratedOutput(null);
       setMessage(result.length ? "Saved outputs loaded." : "No saved outputs found yet.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load saved outputs.");
@@ -427,6 +437,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await listGeneratedOutputs(token, profileId);
       setGeneratedOutputs(result);
+      setSelectedGeneratedOutput((current) => {
+        if (!current) {
+          return null;
+        }
+        return result.find((item) => item.id === current.id) ?? null;
+      });
     } catch {
       // Refreshing history should not hide a successful generation result.
     } finally {
@@ -441,6 +457,46 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Saved output copied.");
     } catch {
       setMessage("Could not copy saved output.");
+    }
+  }
+
+  async function handleOpenGeneratedOutput(output: GeneratedOutput) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsSavedOutputsLoading(true);
+    setMessage(null);
+    try {
+      const result = await getGeneratedOutput(accessToken, profile.id, output.id);
+      setSelectedGeneratedOutput(result);
+      setGeneratedOutputs((current) =>
+        current.map((item) => (item.id === result.id ? result : item)),
+      );
+      setMessage("Saved output opened.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not open saved output.");
+    } finally {
+      setIsSavedOutputsLoading(false);
+    }
+  }
+
+  async function handleDeleteGeneratedOutput(output: GeneratedOutput) {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setDeletingGeneratedOutputId(output.id);
+    setMessage(null);
+    try {
+      await deleteGeneratedOutput(accessToken, profile.id, output.id);
+      setGeneratedOutputs((current) => current.filter((item) => item.id !== output.id));
+      setSelectedGeneratedOutput((current) => (current?.id === output.id ? null : current));
+      setMessage("Saved output deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete saved output.");
+    } finally {
+      setDeletingGeneratedOutputId(null);
     }
   }
 
@@ -1059,39 +1115,61 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               {filteredGeneratedOutputs.length ? (
                 <div className="mt-4 grid gap-3">
                   {filteredGeneratedOutputs.map((item) => (
-                  <div key={item.id} className="border border-border p-3">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                      <p className="font-medium">{formatOutputType(item.output_type)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatOutputDate(item.created_at)}
-                      </p>
+                    <div key={item.id} className="border border-border p-3">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                        <p className="font-medium">{formatOutputType(item.output_type)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatOutputDate(item.created_at)}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-muted-foreground">{generatedOutputSummary(item)}</p>
+                      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
+                        <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
+                      </dl>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isSavedOutputsLoading} type="button" onClick={() => handleOpenGeneratedOutput(item)}>
+                          <Eye aria-hidden="true" className="h-4 w-4" />
+                          View details
+                        </button>
+                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCopyGeneratedOutput(item)}>
+                          <Copy aria-hidden="true" className="h-4 w-4" />
+                          Copy markdown
+                        </button>
+                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleDownloadGeneratedOutput(item)}>
+                          <Download aria-hidden="true" className="h-4 w-4" />
+                          Download .md
+                        </button>
+                        <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={deletingGeneratedOutputId === item.id} type="button" onClick={() => handleDeleteGeneratedOutput(item)}>
+                          <Trash2 aria-hidden="true" className="h-4 w-4" />
+                          {deletingGeneratedOutputId === item.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-2 text-muted-foreground">{generatedOutputSummary(item)}</p>
-                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <JobField label="Provider" values={[item.provider ?? "deterministic"]} />
-                      <JobField label="Version" values={item.prompt_version ? [item.prompt_version] : []} />
-                    </dl>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleCopyGeneratedOutput(item)}>
-                        <Copy aria-hidden="true" className="h-4 w-4" />
-                        Copy markdown
-                      </button>
-                      <button className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={() => handleDownloadGeneratedOutput(item)}>
-                        <Download aria-hidden="true" className="h-4 w-4" />
-                        Download .md
-                      </button>
-                    </div>
-                    {item.result_markdown ? (
-                      <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
-                        {item.result_markdown}
-                      </pre>
-                    ) : null}
-                  </div>
                   ))}
                 </div>
               ) : (
                 <p className="mt-4 text-muted-foreground">No saved outputs match this filter.</p>
               )}
+              {selectedGeneratedOutput ? (
+                <div className="mt-4 border border-border p-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <p className="font-medium">{formatOutputType(selectedGeneratedOutput.output_type)} detail</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatOutputDate(selectedGeneratedOutput.created_at)}
+                    </p>
+                  </div>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <JobField label="Provider" values={[selectedGeneratedOutput.provider ?? "deterministic"]} />
+                    <JobField label="Model" values={selectedGeneratedOutput.model_name ? [selectedGeneratedOutput.model_name] : []} />
+                    <JobField label="Version" values={selectedGeneratedOutput.prompt_version ? [selectedGeneratedOutput.prompt_version] : []} />
+                    <JobField label="Status" values={[selectedGeneratedOutput.status]} />
+                  </dl>
+                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs text-muted-foreground">
+                    {exportContentForOutput(selectedGeneratedOutput)}
+                  </pre>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {aiInterpretationResult ? (

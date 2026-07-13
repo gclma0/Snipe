@@ -29,6 +29,17 @@ from app.ai.llm import (
     ResumeRewriteResult,
     ResumeTailoringPackageResult,
 )
+from app.ai.markdown import (
+    application_materials_markdown,
+    career_transition_markdown,
+    claim_verification_markdown,
+    interpretation_markdown,
+    interview_markdown,
+    outreach_markdown,
+    project_roadmap_markdown,
+    rewrite_markdown,
+    tailoring_markdown,
+)
 from app.ai.outreach import (
     OutreachMessagePack,
     build_outreach_context,
@@ -137,7 +148,7 @@ def create_ai_readiness_interpretation(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _markdown(result),
+                "result_markdown": interpretation_markdown(result),
                 "status": "completed",
             }
         )
@@ -217,7 +228,7 @@ def create_resume_rewrite_suggestions(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _rewrite_markdown(result),
+                "result_markdown": rewrite_markdown(result),
                 "status": "completed",
             }
         )
@@ -297,7 +308,7 @@ def create_resume_tailoring_package(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _tailoring_markdown(result),
+                "result_markdown": tailoring_markdown(result),
                 "status": "completed",
             }
         )
@@ -377,7 +388,7 @@ def create_interview_prep(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _interview_markdown(result),
+                "result_markdown": interview_markdown(result),
                 "status": "completed",
             }
         )
@@ -455,7 +466,7 @@ def create_claim_verification_questions(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _claim_verification_markdown(result),
+                "result_markdown": claim_verification_markdown(result),
                 "status": "completed",
             }
         )
@@ -526,7 +537,7 @@ def create_outreach_message_pack(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _outreach_markdown(result),
+                "result_markdown": outreach_markdown(result),
                 "status": "completed",
             }
         )
@@ -596,7 +607,7 @@ def create_career_transition_analysis(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _career_transition_markdown(result),
+                "result_markdown": career_transition_markdown(result),
                 "status": "completed",
             }
         )
@@ -673,7 +684,7 @@ def create_project_roadmap_recommendations(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _project_roadmap_markdown(result),
+                "result_markdown": project_roadmap_markdown(result),
                 "status": "completed",
             }
         )
@@ -753,7 +764,7 @@ def create_application_materials(
                 "provider": result.provider,
                 "model_name": result.model_name,
                 "result_json": result.model_dump(exclude={"cached"}),
-                "result_markdown": _application_materials_markdown(result),
+                "result_markdown": application_materials_markdown(result),
                 "status": "completed",
             }
         )
@@ -789,219 +800,3 @@ def _get_structured_job(
         )
     return job_description.get("structured_json") or {}
 
-
-def _markdown(result: AIInterpretationResult) -> str:
-    lines = ["# Snipe AI Interpretation", "", result.summary, "", result.readiness_explanation, ""]
-    lines.append("## Recommendations")
-    for item in result.recommendations:
-        lines.extend(["", f"### {item.title}", item.rationale, item.action])
-    if result.cautions:
-        lines.extend(["", "## Cautions"])
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _rewrite_markdown(result: ResumeRewriteResult) -> str:
-    lines = ["# Snipe Resume Rewrite Suggestions", "", result.summary, ""]
-    for item in result.suggestions:
-        lines.extend(
-            [
-                "## Suggestion",
-                f"Original: {item.original}",
-                f"Suggested: {item.suggested}",
-                f"Why: {item.rationale}",
-                "",
-            ]
-        )
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _tailoring_markdown(result: ResumeTailoringPackageResult) -> str:
-    lines = ["# Snipe Resume Tailoring Package", "", result.summary, ""]
-    lines.extend(["## Tailored Summary", result.tailored_summary, ""])
-    if result.skill_order:
-        lines.append("## Skill Order")
-        lines.extend(f"- {skill}" for skill in result.skill_order)
-        lines.append("")
-    if result.keyword_recommendations:
-        lines.append("## Keyword Recommendations")
-        for item in result.keyword_recommendations:
-            lines.extend(
-                [
-                    f"- {item.keyword}: {item.placement}",
-                    f"  Reason: {item.reason}",
-                ]
-            )
-        lines.append("")
-    if result.missing_evidence_warnings:
-        lines.append("## Missing Evidence Warnings")
-        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _interview_markdown(result: InterviewPrepResult) -> str:
-    lines = ["# Snipe Interview Prep", "", result.summary, ""]
-    if result.star_guidance:
-        lines.append("## STAR Guidance")
-        lines.extend(f"- {item}" for item in result.star_guidance)
-        lines.append("")
-    if result.questions:
-        lines.append("## Practice Questions")
-        for item in result.questions:
-            lines.extend(
-                [
-                    f"### {item.category.replace('_', ' ').title()}",
-                    item.question,
-                    f"Why: {item.why_it_matters}",
-                    f"Guidance: {item.answer_guidance}",
-                    "",
-                ]
-            )
-    if result.missing_evidence_warnings:
-        lines.append("## Missing Evidence Warnings")
-        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _claim_verification_markdown(result: ClaimVerificationResult) -> str:
-    lines = ["# Snipe Claim Questions", "", result.summary, ""]
-    if result.questions:
-        lines.append("## Questions")
-        for item in result.questions:
-            lines.extend(
-                [
-                    f"### {item.claim}",
-                    f"Evidence strength: {item.evidence_strength.replace('_', ' ')}",
-                    item.question,
-                    f"Why: {item.why_it_matters}",
-                    "",
-                ]
-            )
-    if result.evidence_strength_notes:
-        lines.append("## Evidence Strength Notes")
-        lines.extend(f"- {note}" for note in result.evidence_strength_notes)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _outreach_markdown(result: OutreachMessagePack) -> str:
-    lines = ["# Snipe Outreach Message Pack", "", result.summary, ""]
-    sections = [
-        ("LinkedIn Connection Message", result.linkedin_connection_message),
-        ("Recruiter Outreach Message", result.recruiter_outreach_message),
-        ("Job Application Email", result.job_application_email),
-        ("Follow-Up Email", result.follow_up_email),
-        ("Interview Thank-You Email", result.interview_thank_you_email),
-        ("Referral Request", result.referral_request),
-        ("Short Professional Intro", result.short_professional_intro),
-    ]
-    for title, content in sections:
-        lines.extend([f"## {title}", content, ""])
-    if result.evidence_used:
-        lines.append("## Evidence Used")
-        lines.extend(f"- {item}" for item in result.evidence_used)
-        lines.append("")
-    if result.missing_evidence_warnings:
-        lines.append("## Missing Evidence")
-        lines.extend(f"- {item}" for item in result.missing_evidence_warnings)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {item}" for item in result.cautions)
-    return "\n".join(lines)
-
-
-def _career_transition_markdown(result: CareerTransitionResult) -> str:
-    lines = ["# Snipe Career Transition Analysis", "", result.summary, ""]
-    sections = [
-        ("Transferable Skills", result.transferable_skills),
-        ("Reframed Experience", result.reframed_experience),
-        ("Missing Foundational Knowledge", result.missing_foundational_knowledge),
-        ("Transitional Roles", result.transitional_roles),
-        ("Recommended Projects", result.recommended_projects),
-        ("Learning Sequence", result.learning_sequence),
-        ("Resume Positioning", result.resume_positioning),
-        ("Likely Interview Concerns", result.likely_interview_concerns),
-        ("Cautions", result.cautions),
-    ]
-    for title, values in sections:
-        if values:
-            lines.append(f"## {title}")
-            lines.extend(f"- {item}" for item in values)
-            lines.append("")
-    return "\n".join(lines).strip()
-
-
-def _project_roadmap_markdown(result: ProjectRoadmapResult) -> str:
-    lines = ["# Snipe Project Roadmap", "", result.summary, ""]
-    if result.projects:
-        lines.append("## Project Recommendations")
-        for item in result.projects:
-            lines.extend(
-                [
-                    f"### {item.title}",
-                    item.objective,
-                    "",
-                    "Skills practiced:",
-                    *[f"- {skill}" for skill in item.skills_practiced],
-                    "Deliverables:",
-                    *[f"- {deliverable}" for deliverable in item.deliverables],
-                    "",
-                ]
-            )
-    if result.roadmap:
-        lines.append("## Roadmap")
-        for item in result.roadmap:
-            lines.extend(
-                [
-                    f"### {item.timeframe.replace('_', ' ').title()}",
-                    item.focus,
-                    "",
-                    "Actions:",
-                    *[f"- {action}" for action in item.actions],
-                    "Success criteria:",
-                    *[f"- {criterion}" for criterion in item.success_criteria],
-                    "",
-                ]
-            )
-    if result.missing_evidence_warnings:
-        lines.append("## Missing Evidence Warnings")
-        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)
-
-
-def _application_materials_markdown(result: ApplicationMaterialsResult) -> str:
-    lines = ["# Snipe Application Materials", "", result.summary, ""]
-    lines.extend(["## Cover Letter", result.cover_letter, ""])
-    lines.extend(["## Concise Cover Note", result.concise_cover_note, ""])
-    lines.extend(["## Email Application", result.email_application, ""])
-    if result.evidence_used:
-        lines.append("## Evidence Used")
-        lines.extend(f"- {item}" for item in result.evidence_used)
-        lines.append("")
-    if result.missing_evidence_warnings:
-        lines.append("## Missing Evidence Warnings")
-        lines.extend(f"- {warning}" for warning in result.missing_evidence_warnings)
-        lines.append("")
-    if result.cautions:
-        lines.append("## Cautions")
-        lines.extend(f"- {caution}" for caution in result.cautions)
-    return "\n".join(lines)

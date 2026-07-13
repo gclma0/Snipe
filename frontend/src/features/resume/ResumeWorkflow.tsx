@@ -339,7 +339,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
-  async function handleCreateAIInterpretation() {
+  async function handleCreateAIInterpretation(forceRegenerate = false) {
     if (!accessToken || !profile) {
       return;
     }
@@ -347,7 +347,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setIsBusy(true);
     setMessage(null);
     try {
-      const result = await createAIReadinessInterpretation(accessToken, profile.id, jobResult?.id ?? null);
+      const result = await createAIReadinessInterpretation(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
       setAiInterpretationResult(result);
       setMessage(result.cached ? "AI interpretation loaded from cache." : "AI interpretation generated.");
     } catch (error) {
@@ -357,7 +362,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
-  async function handleCreateRewriteSuggestions() {
+  async function handleCreateRewriteSuggestions(forceRegenerate = false) {
     if (!accessToken || !profile) {
       return;
     }
@@ -365,7 +370,12 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setIsBusy(true);
     setMessage(null);
     try {
-      const result = await createResumeRewriteSuggestions(accessToken, profile.id, jobResult?.id ?? null);
+      const result = await createResumeRewriteSuggestions(
+        accessToken,
+        profile.id,
+        jobResult?.id ?? null,
+        forceRegenerate,
+      );
       setRewriteResult(result);
       setMessage(result.cached ? "Rewrite suggestions loaded from cache." : "Rewrite suggestions generated.");
     } catch (error) {
@@ -614,13 +624,21 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Generate basic report
               </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateAIInterpretation}>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateAIInterpretation(false)}>
                 <Sparkles aria-hidden="true" className="h-4 w-4" />
                 Generate AI interpretation
               </button>
-              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={handleCreateRewriteSuggestions}>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy || !aiInterpretationResult} type="button" onClick={() => handleCreateAIInterpretation(true)}>
+                <Sparkles aria-hidden="true" className="h-4 w-4" />
+                Regenerate AI interpretation
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy} type="button" onClick={() => handleCreateRewriteSuggestions(false)}>
                 <ScrollText aria-hidden="true" className="h-4 w-4" />
                 Generate rewrite suggestions
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:col-span-2" disabled={isBusy || !rewriteResult} type="button" onClick={() => handleCreateRewriteSuggestions(true)}>
+                <ScrollText aria-hidden="true" className="h-4 w-4" />
+                Regenerate rewrite suggestions
               </button>
             </dl>
           ) : null}

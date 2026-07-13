@@ -89,7 +89,7 @@ class SupabaseClient:
                 f"{self.base_url}/rest/v1/candidate_profiles",
                 headers=self.headers,
                 params={
-                    "select": "id,user_id,version,normalized_json",
+                    "select": "id,user_id,version,career_goal,preferred_role,normalized_json",
                     "id": f"eq.{profile_id}",
                     "user_id": f"eq.{user_id}",
                     "limit": "1",

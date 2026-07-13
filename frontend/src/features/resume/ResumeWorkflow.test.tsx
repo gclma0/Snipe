@@ -66,6 +66,7 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("Saved outputs")).toBeInTheDocument();
     expect(screen.getByText("AI generation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resume quality/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Job matches/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Load history/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate prep/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Project roadmap$/i })).toBeInTheDocument();
@@ -274,6 +275,83 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("Operations dashboard case study")).toBeInTheDocument();
     expect(screen.getByText("7-day plan")).toBeInTheDocument();
     expect(screen.getByText("Do not present recommended projects as completed.")).toBeInTheDocument();
+  });
+
+  it("renders deterministic job matches", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Data Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        analysis_type: "job_match",
+        deterministic_version: "deterministic-job-matcher-v1",
+        query: "Data Analyst",
+        match_count: 1,
+        matches: [
+          {
+            job_reference_id: "job-1",
+            title: "Data Analyst",
+            company: null,
+            match_score: 88,
+            semantic_score: 0.9,
+            skill_alignment_score: 86,
+            matched_skills: ["python", "sql", "excel"],
+            partially_matched_skills: [],
+            missing_skills: ["tableau"],
+            relevant_experience: ["Profile evidence mentions sql."],
+            concerns: ["Missing required skills: tableau."],
+            explanation: "Data Analyst scored 88 because the profile matches python, sql, excel.",
+            apply_recommendation: "apply_with_tailoring",
+            citation: {
+              document_id: "job-1",
+              chunk_id: "chunk-1",
+              title: "Analytics job listing",
+              source_type: "job_listing",
+              source_url: "https://example.com/jobs/data",
+              score: 0.9,
+            },
+          },
+        ],
+        checks: {
+          uses_deterministic_ranking: true,
+          uses_source_citations: true,
+        },
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Data Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /^Job matches$/i }));
+
+    expect(await screen.findByRole("heading", { name: "Job matches" })).toBeInTheDocument();
+    expect(screen.getAllByText("Data Analyst").length).toBeGreaterThan(0);
+    expect(screen.getByText("Apply with tailoring")).toBeInTheDocument();
+    expect(screen.getByText(/Analytics job listing/)).toBeInTheDocument();
   });
 });
 

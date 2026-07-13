@@ -33,6 +33,7 @@ import {
   GitHubSourceResult,
   InterviewPrepResult,
   JobDescriptionResult,
+  JobMatchResult,
   LinkedInSourceResult,
   PortfolioSourceResult,
   ProjectRoadmapResult,
@@ -59,6 +60,7 @@ import {
   getGeneratedOutput,
   listGeneratedOutputs,
   runAtsReadinessAnalysis,
+  runJobMatches,
   runProfileCompletenessAnalysis,
   runReadinessDashboard,
   runResumeQualityAnalysis,
@@ -120,6 +122,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [portfolioResult, setPortfolioResult] = useState<PortfolioSourceResult | null>(null);
   const [linkedInResult, setLinkedInResult] = useState<LinkedInSourceResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
+  const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
@@ -193,6 +196,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setPortfolioResult(null);
       setLinkedInResult(null);
       setSkillGapResult(null);
+      setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
@@ -223,6 +227,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const result = await createJobDescription(accessToken, profile.id, values.text);
       setJobResult(result);
       setSkillGapResult(null);
+      setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
@@ -334,6 +339,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setPortfolioResult(null);
       setLinkedInResult(null);
       setSkillGapResult(null);
+      setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
@@ -373,6 +379,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setPortfolioResult(null);
       setLinkedInResult(null);
       setSkillGapResult(null);
+      setJobMatchResult(null);
       setDashboardResult(null);
       setReportResult(null);
       setAiInterpretationResult(null);
@@ -690,6 +697,26 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleRunJobMatches() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setBusyLabel("Retrieving and ranking job matches...");
+    setMessage(null);
+    try {
+      const result = await runJobMatches(accessToken, profile.id, profile.preferred_role, 10);
+      setJobMatchResult(result);
+      setMessage(result.matches.length ? "Job matches ranked." : "No job references found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not retrieve job matches.");
+    } finally {
+      setIsBusy(false);
+      setBusyLabel(null);
+    }
+  }
+
   async function handleRunSkillGap() {
     if (!accessToken || !profile || !jobResult?.id) {
       return;
@@ -911,6 +938,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                       <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
                       Readiness dashboard
                     </button>
+                    <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleRunJobMatches}>
+                      <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
+                      Job matches
+                    </button>
                     <button className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={handleCreateReport}>
                       <ScrollText aria-hidden="true" className="h-4 w-4" />
                       Basic report
@@ -1067,6 +1098,39 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
                 <JobField label="Primary specialization" values={dashboardResult.interpretation.primary_specialization ? [dashboardResult.interpretation.primary_specialization.name] : []} />
                 <JobField label="Estimated seniority" values={dashboardResult.interpretation.estimated_seniority ? [dashboardResult.interpretation.estimated_seniority] : []} />
               </dl>
+            </div>
+          ) : null}
+          {jobMatchResult ? (
+            <div className="mt-5 border-t border-border pt-5 text-sm">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-base font-semibold">Job matches</h3>
+                <p className="text-xs text-muted-foreground">
+                  {jobMatchResult.match_count} ranked
+                </p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {jobMatchResult.matches.map((item) => (
+                  <div key={`${item.job_reference_id}-${item.citation.chunk_id ?? "chunk"}`} className="border border-border p-3">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-2xl font-semibold">{item.match_score}</p>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">{item.explanation}</p>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <JobField label="Recommendation" values={[formatApplyRecommendation(item.apply_recommendation)]} />
+                      <JobField label="Skill alignment" values={[String(item.skill_alignment_score)]} />
+                      <JobField label="Matched" values={item.matched_skills.slice(0, 8)} />
+                      <JobField label="Missing" values={item.missing_skills.slice(0, 8)} />
+                      <JobField label="Relevant experience" values={item.relevant_experience.slice(0, 3)} />
+                      <JobField label="Concerns" values={item.concerns.slice(0, 4)} />
+                    </dl>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Source: {item.citation.title}
+                      {item.citation.source_url ? ` (${item.citation.source_url})` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {reportResult ? (
@@ -1497,6 +1561,15 @@ function formatRoadmapTimeframe(value: string) {
     "7_day": "7-day plan",
     "30_day": "30-day plan",
     "90_day": "90-day plan",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function formatApplyRecommendation(value: string) {
+  const labels: Record<string, string> = {
+    strong_apply: "Strong apply",
+    apply_with_tailoring: "Apply with tailoring",
+    build_evidence_first: "Build evidence first",
   };
   return labels[value] ?? value.replace(/_/g, " ");
 }

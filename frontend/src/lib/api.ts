@@ -251,6 +251,39 @@ export type ApplicationMaterialsResult = {
   cached: boolean;
 };
 
+export type JobMatch = {
+  job_reference_id: string;
+  title: string;
+  company: string | null;
+  match_score: number;
+  semantic_score: number;
+  skill_alignment_score: number;
+  matched_skills: string[];
+  partially_matched_skills: string[];
+  missing_skills: string[];
+  relevant_experience: string[];
+  concerns: string[];
+  explanation: string;
+  apply_recommendation: "strong_apply" | "apply_with_tailoring" | "build_evidence_first";
+  citation: {
+    document_id: string;
+    chunk_id: string | null;
+    title: string;
+    source_type: string;
+    source_url: string | null;
+    score: number;
+  };
+};
+
+export type JobMatchResult = {
+  analysis_type: string;
+  deterministic_version: string;
+  query: string;
+  match_count: number;
+  matches: JobMatch[];
+  checks: Record<string, boolean>;
+};
+
 export type GeneratedOutput = {
   id: string;
   output_type: string;
@@ -401,6 +434,21 @@ export function runReadinessDashboard(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ job_description_id: jobDescriptionId ?? null }),
+  });
+}
+
+export function runJobMatches(
+  token: string,
+  profileId: string,
+  query?: string | null,
+  limit = 10,
+) {
+  return request<JobMatchResult>(`/profiles/${profileId}/job-matches`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query: query || null, limit }),
   });
 }
 

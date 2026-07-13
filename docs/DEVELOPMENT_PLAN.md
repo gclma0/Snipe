@@ -19,7 +19,6 @@ Current build status: Milestone 20 is implemented at usable depth, with Mileston
 
 Known later-phase gaps:
 
-- Frontend support for uploaded target job-description documents.
 - Exportable user data, audit-friendly privacy events, and optional delete-after-parsing controls.
 
 ## Milestone 1: Project Foundation And Documentation Baseline

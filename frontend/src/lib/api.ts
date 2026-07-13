@@ -164,6 +164,15 @@ export function createJobDescription(token: string, profileId: string, text: str
   });
 }
 
+export function uploadJobDescription(token: string, profileId: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  return request<JobDescriptionResult>(`/profiles/${profileId}/job-descriptions/upload`, token, {
+    method: "POST",
+    body,
+  });
+}
+
 export function listJobDescriptions(token: string, profileId: string) {
   return request<JobDescriptionResult[]>(`/profiles/${profileId}/job-descriptions`, token);
 }

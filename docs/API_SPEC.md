@@ -124,7 +124,7 @@ Runs platform-defined profile-completeness scoring.
 
 ### POST `/profiles/{profile_id}/job-descriptions`
 
-Creates a target job description from pasted text or uploaded document.
+Creates a target job description from pasted text.
 
 Extracts:
 

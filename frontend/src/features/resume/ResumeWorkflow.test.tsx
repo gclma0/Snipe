@@ -187,6 +187,7 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Resume quality/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Job matches/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Full report/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Upload job file/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Data summary/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Delete documents only/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Load history/i })).toBeInTheDocument();
@@ -302,6 +303,76 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Copy markdown/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download \.md/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Delete$/i })).toBeInTheDocument();
+  });
+
+  it("uploads a target job description file", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        id: "job-upload-id",
+        profile_id: "profile-id",
+        source_type: "uploaded_docx",
+        input_hash: "job-upload-hash",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Operations Analyst",
+          company: "Acme Logistics",
+          required_skills: ["excel", "sql"],
+          preferred_skills: ["project management"],
+          tools: ["excel"],
+          soft_skills: ["communication"],
+          responsibilities: ["Build operations reports"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["excel", "sql", "operations"],
+        },
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const resumeInput = await screen.findByLabelText(/Upload resume/i);
+    await user.upload(resumeInput, new File(["resume content"], "resume.pdf", { type: "application/pdf" }));
+    const jobInput = await screen.findByLabelText(/Upload job file/i);
+    await user.upload(
+      jobInput,
+      new File(["job description content"], "job.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+
+    expect(await screen.findByText("Job description upload analyzed.")).toBeInTheDocument();
+    expect(screen.getByText("Active target selected")).toBeInTheDocument();
+    expect(screen.getByLabelText("Saved target jobs")).toHaveValue("job-upload-id");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/profiles/profile-id/job-descriptions/upload"),
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("adds and searches reference library documents", async () => {

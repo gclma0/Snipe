@@ -99,6 +99,7 @@ import {
   searchJobRagReferences,
   searchRagReferences,
   startMockInterview,
+  uploadJobDescription,
   uploadLinkedInSource,
   uploadResume,
 } from "@/lib/api";
@@ -351,6 +352,52 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleUploadJobDescription(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!accessToken || !profile) {
+      return;
+    }
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await uploadJobDescription(accessToken, profile.id, file);
+      setJobResult(result);
+      setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
+      setSkillGapResult(null);
+      setJobMatchResult(null);
+      setDashboardResult(null);
+      setReportResult(null);
+      setFullReportResult(null);
+      setAiInterpretationResult(null);
+      setRewriteResult(null);
+      setTailoringResult(null);
+      setInterviewResult(null);
+      setClaimVerificationResult(null);
+      setMockInterviewSession(null);
+      setMockInterviewEvaluation(null);
+      setMockInterviewAnswer("");
+      setOutreachResult(null);
+      setCareerTransitionResult(null);
+      setProjectRoadmapResult(null);
+      setLearningPlanResult(null);
+      setLinkedInOptimizationResult(null);
+      setApplicationMaterialsResult(null);
+      setGeneratedOutputs([]);
+      setGeneratedOutputFilter("all");
+      setSelectedGeneratedOutput(null);
+      setMessage("Job description upload analyzed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not upload job description.");
     } finally {
       setIsBusy(false);
     }
@@ -1599,6 +1646,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onOpenSavedJobMatch={handleOpenSavedJobMatch}
             onRunJobMatches={handleRunJobMatches}
             onSelectJobDescription={handleSelectJobDescription}
+            onUploadJobDescription={handleUploadJobDescription}
           />
           {profile ? (
             <RagReferencePanel

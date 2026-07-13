@@ -1,4 +1,5 @@
 import { BriefcaseBusiness } from "lucide-react";
+import { ChangeEvent } from "react";
 import { UseFormReturn } from "react-hook-form";
 
 import { JobDescriptionValues } from "@/features/resume/resumeWorkflowForms";
@@ -15,6 +16,7 @@ type TargetJobFormProps = {
   matchQuery: string;
   selectedJobId: string | null;
   onCreateJobDescription: (values: JobDescriptionValues) => void;
+  onUploadJobDescription: (event: ChangeEvent<HTMLInputElement>) => void;
   onLoadJobMatchHistory: () => void;
   onMatchLimitChange: (value: number) => void;
   onMatchQueryChange: (value: string) => void;
@@ -34,6 +36,7 @@ export function TargetJobForm({
   matchQuery,
   selectedJobId,
   onCreateJobDescription,
+  onUploadJobDescription,
   onLoadJobMatchHistory,
   onMatchLimitChange,
   onMatchQueryChange,
@@ -76,6 +79,11 @@ export function TargetJobForm({
         <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
         Analyze job description
       </button>
+      <label className="ml-0 mt-3 inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:ml-2">
+        <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
+        Upload job file
+        <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={isBusy} onChange={onUploadJobDescription} />
+      </label>
       <div className="mt-5 border-t border-border pt-5">
         <h4 className="text-sm font-semibold">Job match search</h4>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_9rem]">

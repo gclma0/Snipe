@@ -561,3 +561,23 @@ export function searchRagReferences(
     }),
   });
 }
+
+export function searchJobRagReferences(
+  token: string,
+  payload: {
+    query: string;
+    limit?: number;
+  },
+) {
+  return request<RagSearchResult>("/rag/jobs/search", token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source_types: ["job_description", "job_listing"],
+      limit: payload.limit ?? 5,
+      query: payload.query,
+    }),
+  });
+}

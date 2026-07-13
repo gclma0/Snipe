@@ -334,6 +334,23 @@ describe("ResumeWorkflow", () => {
           },
         ],
       },
+      {
+        query: "python sql analytics",
+        embedding_model: "deterministic-hashing-v1",
+        citations: [
+          {
+            document_id: "doc-2",
+            chunk_id: "chunk-2",
+            title: "Analytics Job Description",
+            source_type: "job_description",
+            source_url: null,
+            chunk_index: 0,
+            content: "Job-only citation with Python, SQL, and analytics requirements.",
+            score: 0.87,
+            metadata: {},
+          },
+        ],
+      },
     ]);
     render(<ResumeWorkflow accessToken="token" />);
 
@@ -355,6 +372,10 @@ describe("ResumeWorkflow", () => {
     await user.click(screen.getByRole("button", { name: /Search references/i }));
 
     expect(await screen.findByText("Python SQL analytics dashboards stakeholder reporting.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Search job references only/i }));
+
+    expect(await screen.findByText("Job reference results")).toBeInTheDocument();
+    expect(screen.getByText("Job-only citation with Python, SQL, and analytics requirements.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/rag/documents"),
       expect.objectContaining({ method: "POST" }),
@@ -364,6 +385,16 @@ describe("ResumeWorkflow", () => {
       expect.objectContaining({
         body: JSON.stringify({
           source_types: [],
+          limit: 5,
+          query: "python sql analytics",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/rag/jobs/search"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          source_types: ["job_description", "job_listing"],
           limit: 5,
           query: "python sql analytics",
         }),

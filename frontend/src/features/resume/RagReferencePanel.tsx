@@ -12,6 +12,7 @@ const sourceTypeOptions: { value: RagSourceType; label: string }[] = [
 type RagReferencePanelProps = {
   documentResult: RagDocumentResult | null;
   searchResult: RagSearchResult | null;
+  jobSearchResult: RagSearchResult | null;
   isBusy: boolean;
   title: string;
   sourceType: RagSourceType;
@@ -26,12 +27,14 @@ type RagReferencePanelProps = {
   onQueryChange: (value: string) => void;
   onLimitChange: (value: number) => void;
   onIngest: () => void;
+  onJobSearch: () => void;
   onSearch: () => void;
 };
 
 export function RagReferencePanel({
   documentResult,
   searchResult,
+  jobSearchResult,
   isBusy,
   title,
   sourceType,
@@ -46,6 +49,7 @@ export function RagReferencePanel({
   onQueryChange,
   onLimitChange,
   onIngest,
+  onJobSearch,
   onSearch,
 }: RagReferencePanelProps) {
   return (
@@ -146,28 +150,51 @@ export function RagReferencePanel({
           <Search aria-hidden="true" className="h-4 w-4" />
           Search references
         </button>
+        <button
+          className="ml-0 mt-3 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium sm:ml-2"
+          disabled={isBusy}
+          type="button"
+          onClick={onJobSearch}
+        >
+          <Search aria-hidden="true" className="h-4 w-4" />
+          Search job references only
+        </button>
       </div>
       {searchResult ? (
-        <div className="mt-4 grid gap-3">
-          {searchResult.citations.length ? (
-            searchResult.citations.map((item) => (
-              <div key={`${item.document_id}-${item.chunk_id ?? item.chunk_index}`} className="border border-border p-3">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(item.score * 100)}%</p>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {item.source_type}
-                  {item.source_url ? ` - ${item.source_url}` : ""}
-                </p>
-                <p className="mt-2 text-muted-foreground">{item.content.slice(0, 360)}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground">No matching references found.</p>
-          )}
+        <div className="mt-4">
+          <CitationList result={searchResult} />
         </div>
       ) : null}
+      {jobSearchResult ? (
+        <div className="mt-4 border-t border-border pt-4">
+          <h4 className="text-sm font-semibold">Job reference results</h4>
+          <CitationList result={jobSearchResult} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CitationList({ result }: { result: RagSearchResult }) {
+  if (!result.citations.length) {
+    return <p className="mt-3 text-muted-foreground">No matching references found.</p>;
+  }
+
+  return (
+    <div className="mt-3 grid gap-3">
+      {result.citations.map((item) => (
+        <div key={`${item.document_id}-${item.chunk_id ?? item.chunk_index}`} className="border border-border p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <p className="font-medium">{item.title}</p>
+            <p className="text-xs text-muted-foreground">{Math.round(item.score * 100)}%</p>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {item.source_type}
+            {item.source_url ? ` - ${item.source_url}` : ""}
+          </p>
+          <p className="mt-2 text-muted-foreground">{item.content.slice(0, 360)}</p>
+        </div>
+      ))}
     </div>
   );
 }

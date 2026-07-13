@@ -85,6 +85,7 @@ import {
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
+  searchJobRagReferences,
   searchRagReferences,
   startMockInterview,
   uploadLinkedInSource,
@@ -126,6 +127,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
   const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
   const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
+  const [jobRagSearchResult, setJobRagSearchResult] = useState<RagSearchResult | null>(null);
   const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
   const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
   const [selectedGeneratedOutput, setSelectedGeneratedOutput] = useState<GeneratedOutput | null>(null);
@@ -1241,6 +1243,32 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     }
   }
 
+  async function handleSearchJobRagReferences() {
+    if (!accessToken) {
+      return;
+    }
+
+    if (ragQuery.trim().length < 2) {
+      setMessage("Enter at least 2 characters to search job references.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await searchJobRagReferences(accessToken, {
+        query: ragQuery.trim(),
+        limit: ragLimit,
+      });
+      setJobRagSearchResult(result);
+      setMessage(result.citations.length ? "Job references searched." : "No matching job references found.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not search job references.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <section className="mt-8 max-w-2xl border border-border bg-white p-5">
       <h2 className="text-base font-semibold">Candidate profile</h2>
@@ -1316,6 +1344,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             <RagReferencePanel
               documentResult={ragDocumentResult}
               isBusy={isBusy}
+              jobSearchResult={jobRagSearchResult}
               limit={ragLimit}
               query={ragQuery}
               searchResult={ragSearchResult}
@@ -1324,6 +1353,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
               text={ragText}
               title={ragTitle}
               onIngest={handleIngestRagReference}
+              onJobSearch={handleSearchJobRagReferences}
               onLimitChange={setRagLimit}
               onQueryChange={setRagQuery}
               onSearch={handleSearchRagReferences}

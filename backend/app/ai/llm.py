@@ -185,10 +185,47 @@ def _local_template_interpretation(context: dict[str, Any]) -> AIInterpretationR
     readiness = context["readiness"]
     skill_gap = context.get("skill_gap") or {}
     generation_mode = context.get("generation_mode")
+    verified_skills = context.get("skills") or []
     missing = skill_gap.get("missing") or []
     matched = skill_gap.get("matched") or []
     specialization = readiness.get("primary_specialization") or "the target career area"
-    if generation_mode == "alternate":
+    if not verified_skills:
+        recommendations = [
+            AIRecommendation(
+                title="Add verified skills to the resume",
+                rationale=(
+                    "Snipe did not find clear skill evidence in the resume/profile. Skills such "
+                    "as Excel, SQL, tools, methods, or profession-specific capabilities are major "
+                    "resume and matching signals when they are true and supported."
+                ),
+                action=(
+                    "Add a skills section and connect each important skill to real experience, "
+                    "projects, coursework, certifications, or portfolio evidence."
+                ),
+                priority="high",
+            ),
+            AIRecommendation(
+                title="Support each skill with proof",
+                rationale=(
+                    "A list of skills is weaker when the experience section does not show where "
+                    "those skills were used."
+                ),
+                action=(
+                    "For each skill you add, include one honest bullet or source that shows how "
+                    "you used it. Do not add skills you cannot support."
+                ),
+                priority="high",
+            ),
+        ]
+        summary = (
+            "Snipe did not find verified skills or strong skill evidence in this profile yet."
+        )
+        explanation = (
+            "Skills and supporting evidence are one of the main factors in resume quality, ATS "
+            "matching, and job-fit analysis. Add only real skills that are supported by your "
+            "experience, projects, education, certifications, portfolio, or LinkedIn content."
+        )
+    elif generation_mode == "alternate":
         recommendations = [
             AIRecommendation(
                 title="Turn gaps into a short evidence plan",
@@ -344,6 +381,17 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
         provider="local_template",
         model_name="local-template-v1",
         summary=(
+            (
+                "Regenerated view: no verified skills were found; add real, supported skills "
+                "before relying on rewrites."
+            )
+            if not verified_skills and generation_mode == "alternate"
+            else (
+                "No verified skills were found; add real, supported skills before relying "
+                "on rewrites."
+            )
+            if not verified_skills
+            else
             "Regenerated rewrite suggestions use an alternate evidence-bound structure."
             if generation_mode == "alternate"
             else "Rewrite suggestions are based only on compact extracted resume evidence."
@@ -351,6 +399,11 @@ def _local_template_resume_rewrite(context: dict[str, Any]) -> ResumeRewriteResu
         suggestions=suggestions,
         cautions=[
             (
+                "Snipe did not find verified skills such as Excel, SQL, tools, methods, or "
+                "profession-specific capabilities. Add only real skills you can support."
+            )
+            if not verified_skills
+            else (
                 "Review every suggestion before use and replace placeholders only with true, "
                 "verifiable details."
             )

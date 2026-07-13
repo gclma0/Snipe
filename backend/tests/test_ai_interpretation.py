@@ -147,6 +147,18 @@ def structured_job() -> dict[str, Any]:
     }
 
 
+def profile_without_skills() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "sources": [{"source_id": "source-id"}],
+        "sections": {
+            "summary": "Candidate summary without explicit skill keywords.",
+            "experience": "Helped the team complete weekly work.",
+        },
+        "skills": [],
+    }
+
+
 def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClient:
     import app.api.routes.ai as ai_route
 
@@ -263,6 +275,39 @@ def test_local_interpretation_alternate_mode_changes_summary() -> None:
 
     assert default_result.summary != alternate_result.summary
     assert default_result.recommendations[0].title != alternate_result.recommendations[0].title
+
+
+def test_local_interpretation_explains_missing_skill_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_ai_interpretation_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_interpretation(context)
+
+    assert "did not find verified skills" in result.summary.lower()
+    assert "major resume" in result.recommendations[0].rationale.lower()
+    assert "do not add skills you cannot support" in result.recommendations[1].action.lower()
+
+
+def test_local_resume_rewrite_explains_missing_skill_evidence() -> None:
+    readiness = build_readiness_dashboard(profile_without_skills(), structured_job())
+    context = build_resume_rewrite_context(
+        normalized_profile=profile_without_skills(),
+        readiness=readiness,
+        structured_job=structured_job(),
+    )
+
+    result = AIClient(
+        Settings(supabase_url=None, supabase_jwt_secret=TEST_SECRET)
+    ).generate_resume_rewrite_suggestions(context)
+
+    assert "no verified skills were found" in result.summary.lower()
+    assert "add only real skills" in result.cautions[0].lower()
 
 
 def test_ai_interpretation_endpoint_generates_and_persists(monkeypatch) -> None:

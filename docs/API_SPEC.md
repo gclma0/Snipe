@@ -8,6 +8,7 @@
 - Validation errors: structured JSON with field-level details.
 - Long-running or expensive AI outputs should return a job/status pattern when needed.
 - Endpoints must enforce user ownership for every profile, source, analysis, and generated output.
+- Every backend response includes `X-Request-ID` for support correlation and `X-Process-Time-ms` for lightweight timing diagnostics. A caller-supplied `X-Request-ID` is preserved when valid.
 
 ## Health
 
@@ -18,6 +19,8 @@ Returns backend status, version, and dependency health where safe.
 ### GET `/health/ai-provider`
 
 Returns non-secret AI provider configuration status. The response identifies whether the backend is using the local-template fallback or an external OpenAI-compatible provider, whether required settings are present, and any configuration issues. API key values must never be returned.
+
+The check validates provider support, required model name, required API key presence, placeholder API key values, `openai_compatible` base URL presence, and base URL format. It does not make a paid external model call.
 
 The frontend exposes this check in the AI provider status panel so configuration can be verified without using Swagger or command-line tools.
 

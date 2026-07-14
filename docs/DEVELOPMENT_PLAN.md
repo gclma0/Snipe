@@ -23,11 +23,15 @@ Known product-scope gaps from the approved documentation:
 
 Remaining hardening and polish items:
 
-- Run an end-to-end production smoke pass after applying the latest Supabase migrations; a repeatable smoke script, manual checklist, and GitHub Actions workflow are available.
-- Continue splitting the large resume workflow UI into smaller maintainable feature surfaces as future changes touch each domain.
-- Add broader browser-level integration tests for the longest user journeys; target-specific saved-output refresh coverage has been added.
-- Validate configured external LLM providers beyond the local-template fallback; non-secret provider configuration health is now available in the API and frontend.
-- Review UX copy and empty states for first-time users; profile, resume, saved-output, target-job, job-match, and reference-library empty states have been improved.
+- None currently identified.
+
+Completed hardening and polish:
+
+- Production smoke coverage is available through a repeatable script, manual checklist, and GitHub Actions workflow.
+- The large resume workflow UI has been split into focused hooks for generated outputs, AI generation, target jobs, RAG references, and privacy controls.
+- Longer frontend integration coverage now exercises profile creation, resume upload, target-job analysis, readiness scoring, AI generation, saved-output refresh, and saved-output detail viewing.
+- External LLM provider configuration health validates supported provider names, required model settings, API key presence, placeholder key values, and base URL format without exposing secrets or making paid network calls.
+- First-time UX copy and empty states have been improved for profile, resume, saved-output, target-job, job-match, and reference-library flows.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

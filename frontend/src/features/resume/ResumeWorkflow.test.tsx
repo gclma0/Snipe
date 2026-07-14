@@ -1573,6 +1573,162 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByText("profile documents deleted")).toBeInTheDocument();
     expect(screen.getByText(/deleted_storage_objects/i)).toBeInTheDocument();
   });
+
+  it("runs a long target-job journey from upload through AI output history", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        id: "job-id",
+        profile_id: "profile-id",
+        source_type: "pasted_text",
+        input_hash: "job-hash",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Operations Analyst",
+          company: "Acme Logistics",
+          required_skills: ["excel", "sql"],
+          preferred_skills: ["tableau"],
+          tools: ["excel", "tableau"],
+          soft_skills: ["communication"],
+          responsibilities: ["Build recurring operations dashboards"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["excel", "sql", "tableau", "operations"],
+        },
+      },
+      {
+        analysis_type: "ats_readiness",
+        deterministic_version: "deterministic-ats-readiness-v1",
+        score: 82,
+        findings: [
+          {
+            code: "ats_keyword_coverage",
+            severity: "medium",
+            title: "Keyword coverage",
+            detail: "Most required terms are present.",
+            recommendation: "Add verified SQL evidence before applying.",
+          },
+        ],
+        checks: { has_resume: true },
+      },
+      {
+        analysis_type: "profile_completeness",
+        deterministic_version: "deterministic-profile-completeness-v1",
+        score: 76,
+        findings: [],
+        checks: { has_resume: true },
+      },
+      {
+        output_type: "ai_readiness_interpretation",
+        output_version: "ai-readiness-interpretation-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        summary: "Snipe sees a credible operations analyst fit.",
+        readiness_explanation: "The resume has operations evidence but should add verified SQL examples.",
+        recommendations: [
+          {
+            title: "Add SQL evidence",
+            rationale: "The target role requires SQL.",
+            action: "Add only real SQL coursework, projects, or work examples.",
+            priority: "high",
+          },
+        ],
+        cautions: ["Do not invent SQL experience."],
+        cached: false,
+      },
+      [
+        {
+          id: "output-id",
+          output_type: "ai_readiness_interpretation",
+          job_description_id: "job-id",
+          prompt_version: "ai-readiness-interpretation-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "Snipe sees a credible operations analyst fit." },
+          result_markdown: "# AI interpretation\n\nAdd verified SQL evidence.",
+          status: "completed",
+          created_at: "2026-07-14T10:00:00Z",
+        },
+      ],
+      {
+        id: "output-id",
+        output_type: "ai_readiness_interpretation",
+        job_description_id: "job-id",
+        prompt_version: "ai-readiness-interpretation-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        result_json: { summary: "Snipe sees a credible operations analyst fit." },
+        result_markdown: "# AI interpretation\n\nAdd verified SQL evidence.",
+        status: "completed",
+        created_at: "2026-07-14T10:00:00Z",
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    await user.upload(
+      await screen.findByLabelText(/Upload resume/i),
+      new File(["resume content"], "resume.pdf", { type: "application/pdf" }),
+    );
+    await user.type(
+      screen.getByPlaceholderText("Paste a target job description here."),
+      "Operations Analyst at Acme Logistics. Requirements include Excel, SQL, Tableau, communication, and recurring operations dashboards for leadership reporting.",
+    );
+    await user.click(screen.getByRole("button", { name: /Analyze job description/i }));
+    await user.click(await screen.findByRole("button", { name: /Readiness scores/i }));
+
+    expect(await screen.findByText("Snipe ATS Readiness")).toBeInTheDocument();
+    expect(screen.getByText("Profile Completeness")).toBeInTheDocument();
+    expect(screen.getByText("Add verified SQL evidence before applying.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^AI interpretation$/i }));
+
+    expect(await screen.findAllByText("Snipe sees a credible operations analyst fit.")).toHaveLength(2);
+    expect(screen.getByText("Add SQL evidence")).toBeInTheDocument();
+    expect(screen.getByText("Do not invent SQL experience.")).toBeInTheDocument();
+    expect(screen.getByText("Active target: Operations Analyst at Acme Logistics")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /View details/i }));
+
+    expect(await screen.findByText("AI interpretation detail")).toBeInTheDocument();
+    expect(screen.getAllByText(/Add verified SQL evidence/i).length).toBeGreaterThanOrEqual(2);
+    expect(
+      (fetchMock.mock.calls as unknown as FetchCall[]).some(([url, init]) =>
+        String(url).includes("/profiles/profile-id/ai/readiness-interpretation") &&
+        init?.body === JSON.stringify({ job_description_id: "job-id", force_regenerate: false }),
+      ),
+    ).toBe(true);
+    expect(
+      (fetchMock.mock.calls as unknown as FetchCall[]).some(([url]) =>
+        String(url).includes("/profiles/profile-id/generated-outputs/output-id"),
+      ),
+    ).toBe(true);
+  });
 });
 
 function mockFetch(responses: unknown[]) {

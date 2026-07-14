@@ -15,6 +15,7 @@ from app.api.routes.rag import router as rag_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.sources import router as sources_router
 from app.core.config import Settings, get_settings
+from app.core.request_context import RequestContextMiddleware
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc" if active_settings.enable_docs else None,
     )
     app.state.settings = active_settings
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=active_settings.cors_origins,

@@ -217,9 +217,16 @@ Requirements:
 - Provide delete-my-data workflow.
 - Track what data is retained.
 - Keep provider calls minimal and structured.
-- Expose only non-secret provider configuration health so external LLM setup can be validated without revealing API key values or making paid network calls.
+- Expose only non-secret provider configuration health so external LLM setup can validate supported provider names, required model settings, API key presence, placeholder key values, and base URL format without revealing API key values or making paid network calls.
 - Avoid direct LinkedIn scraping.
 - Avoid unsupported claims about commercial ATS systems.
+
+## Production Diagnostics
+
+- Add `X-Request-ID` to every backend response so frontend reports, Render logs, and API traces can be correlated without paid observability tooling.
+- Preserve a caller-provided `X-Request-ID` when it is present and reasonably sized; otherwise generate a UUID-based value.
+- Add `X-Process-Time-ms` to backend responses for lightweight latency checks during smoke testing.
+- Do not include raw resume text, uploaded document content, API keys, or JWTs in diagnostic headers or logs.
 
 ## Testing Strategy
 

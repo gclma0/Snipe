@@ -8,18 +8,26 @@
 
 ## Current Implementation Status
 
-Current build status: Milestone 20 is implemented at usable depth, with Milestones 21-23 partially implemented ahead of strict sequence.
+Current build status: Milestones 1-24 are implemented at usable depth.
 
-- Milestones 1-14 are implemented at usable depth.
-- Milestones 15-18 are partially implemented through evidence-bound AI outputs, generated-output caching, and saved-output history.
+- Milestones 1-14 are implemented at usable depth and cover the MVP plus optional evidence sources.
+- Milestones 15-18 are implemented at usable depth through evidence-bound AI outputs, generated-output caching, and saved-output history.
 - Milestone 19 is implemented with RAG ingestion, retrieval, source filters, and reference-library management.
 - Milestone 20 is implemented for deterministic RAG-backed job matching and saved job-match history.
-- Milestones 21-23 have been started ahead of strict sequence through interview prep, claim questions, mock interview, answer evaluation, outreach, career-transition outputs, LinkedIn optimization, and learning-plan generation.
+- Milestones 21-23 are implemented at usable depth through interview prep, claim questions, mock interview, answer evaluation, outreach, career-transition outputs, LinkedIn optimization, and learning-plan generation.
 - Milestone 24 is implemented at usable depth through full reports, data export, privacy event history, delete-after-parsing controls, and baseline privacy controls.
 
-Known later-phase gaps:
+Known product-scope gaps from the approved documentation:
 
 - None currently identified from the approved documentation scope.
+
+Remaining hardening and polish items:
+
+- Run an end-to-end production smoke pass after applying the latest Supabase migrations.
+- Continue splitting the large resume workflow UI into smaller maintainable feature surfaces as future changes touch each domain.
+- Add broader browser-level integration tests for the longest user journeys; target-specific saved-output refresh coverage has been added.
+- Validate configured external LLM providers beyond the local-template fallback.
+- Review UX copy and empty states for first-time users.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

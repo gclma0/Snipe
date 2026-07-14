@@ -60,6 +60,22 @@ export function fullReportFilename(report: FullCareerReportResult) {
   return `snipe-${titlePart || "full-career-report"}.md`.toLowerCase();
 }
 
+export function downloadJson(filename: string, data: unknown) {
+  downloadTextFile(filename, JSON.stringify(data, null, 2), "application/json");
+}
+
+export function downloadTextFile(filename: string, content: string, type = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function formatRoadmapTimeframe(value: string) {
   const labels: Record<string, string> = {
     "7_day": "7-day plan",

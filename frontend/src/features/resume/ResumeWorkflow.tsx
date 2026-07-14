@@ -1,6 +1,4 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 
 import { SavedOutputsPanel } from "@/features/resume/SavedOutputsPanel";
 import { ProfileSourcesPanel } from "@/features/resume/ProfileSourcesPanel";
@@ -9,19 +7,22 @@ import { JobAnalysisResults, ReadinessResults, ReportResults } from "@/features/
 import { AIResultsPanel } from "@/features/resume/AIResultsPanel";
 import { ResumeUploadSummary } from "@/features/resume/ResumeUploadSummary";
 import { TargetJobForm } from "@/features/resume/TargetJobForm";
-import { exportContentForOutput, fullReportFilename, generatedOutputFilename } from "@/features/resume/generatedOutputFormatting";
+import {
+  downloadJson,
+  downloadTextFile,
+  exportContentForOutput,
+  fullReportFilename,
+  generatedOutputFilename,
+} from "@/features/resume/generatedOutputFormatting";
 import {
   GitHubValues,
   JobDescriptionValues,
   LinkedInValues,
   PortfolioValues,
   ProfileValues,
-  githubSchema,
-  jobDescriptionSchema,
-  linkedInSchema,
-  portfolioSchema,
-  profileSchema,
 } from "@/features/resume/resumeWorkflowForms";
+import { useResumeWorkflowDerivedState } from "@/features/resume/useResumeWorkflowDerivedState";
+import { useResumeWorkflowForms } from "@/features/resume/useResumeWorkflowForms";
 import {
   BasicReportResult,
   AIInterpretationResult,
@@ -172,46 +173,18 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [ragQuery, setRagQuery] = useState("");
   const [ragLimit, setRagLimit] = useState(5);
   const [ragSearchSourceTypes, setRagSearchSourceTypes] = useState<RagSourceType[]>([]);
-  const activeTargetLabel = jobResult
-    ? `${jobResult.structured.title ?? "Target role"}${jobResult.structured.company ? ` at ${jobResult.structured.company}` : ""}`
-    : null;
-  const filteredGeneratedOutputs =
-    generatedOutputFilter === "all"
-      ? generatedOutputs
-      : generatedOutputFilter === "active_target"
-        ? generatedOutputs.filter((item) => Boolean(jobResult?.id) && item.job_description_id === jobResult?.id)
-        : generatedOutputs.filter((item) => item.output_type === generatedOutputFilter);
-  const form = useForm<ProfileValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      career_goal: "Prepare for a target role",
-      preferred_role: "",
-    },
+  const { activeTargetLabel, filteredGeneratedOutputs } = useResumeWorkflowDerivedState({
+    generatedOutputFilter,
+    generatedOutputs,
+    jobResult,
   });
-  const jobForm = useForm<JobDescriptionValues>({
-    resolver: zodResolver(jobDescriptionSchema),
-    defaultValues: {
-      text: "",
-    },
-  });
-  const githubForm = useForm<GitHubValues>({
-    resolver: zodResolver(githubSchema),
-    defaultValues: {
-      username_or_url: "",
-    },
-  });
-  const portfolioForm = useForm<PortfolioValues>({
-    resolver: zodResolver(portfolioSchema),
-    defaultValues: {
-      url: "",
-    },
-  });
-  const linkedInForm = useForm<LinkedInValues>({
-    resolver: zodResolver(linkedInSchema),
-    defaultValues: {
-      text: "",
-    },
-  });
+  const {
+    profileForm: form,
+    jobForm,
+    githubForm,
+    portfolioForm,
+    linkedInForm,
+  } = useResumeWorkflowForms();
 
   async function handleCreateProfile(values: ProfileValues) {
     if (!accessToken) {
@@ -961,15 +934,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
 
   function handleDownloadGeneratedOutput(output: GeneratedOutput) {
     const content = exportContentForOutput(output);
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = generatedOutputFilename(output);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadTextFile(generatedOutputFilename(output), content, "text/markdown;charset=utf-8");
     setMessage("Saved output downloaded.");
   }
 
@@ -978,15 +943,11 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       return;
     }
 
-    const blob = new Blob([fullReportResult.markdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fullReportFilename(fullReportResult);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadTextFile(
+      fullReportFilename(fullReportResult),
+      fullReportResult.markdown,
+      "text/markdown;charset=utf-8",
+    );
     setMessage("Full report downloaded.");
   }
 
@@ -1809,16 +1770,4 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
   );
-}
-
-function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }

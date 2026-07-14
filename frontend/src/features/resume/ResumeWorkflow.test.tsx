@@ -413,6 +413,128 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /^Delete$/i })).toBeInTheDocument();
   });
 
+  it("refreshes saved outputs after generating active-target tailoring", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        id: "job-id",
+        profile_id: "profile-id",
+        source_type: "pasted_text",
+        input_hash: "job-hash",
+        structured: {
+          parser_version: "deterministic-job-parser-v1",
+          title: "Operations Analyst",
+          company: "Acme Logistics",
+          required_skills: ["excel", "sql"],
+          preferred_skills: ["tableau"],
+          tools: ["excel", "tableau"],
+          soft_skills: ["communication"],
+          responsibilities: ["Build operations reports"],
+          education: [],
+          experience_requirements: [],
+          seniority: null,
+          ats_keywords: ["excel", "sql", "tableau", "operations"],
+        },
+      },
+      {
+        output_type: "ai_resume_tailoring_package",
+        output_version: "ai-resume-tailoring-package-v1",
+        provider: "local_template",
+        model_name: "local-template-v1",
+        summary: "Tailoring generated for active target.",
+        tailored_summary: "Evidence-bound operations analyst summary.",
+        skill_order: ["excel", "sql"],
+        keyword_recommendations: [
+          {
+            keyword: "sql",
+            recommendation: "Add SQL only where verified by real experience.",
+            evidence_to_use: ["resume"],
+            missing_evidence_warning: null,
+          },
+        ],
+        missing_evidence_warnings: [],
+        cautions: ["Do not invent unsupported metrics."],
+        cached: false,
+      },
+      [
+        {
+          id: "target-output-id",
+          output_type: "ai_resume_tailoring_package",
+          job_description_id: "job-id",
+          prompt_version: "ai-resume-tailoring-package-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "Target tailoring history summary." },
+          result_markdown: "# Snipe Tailoring Package",
+          status: "completed",
+          created_at: "2026-07-13T12:00:00Z",
+        },
+        {
+          id: "other-output-id",
+          output_type: "ai_learning_plan",
+          job_description_id: null,
+          prompt_version: "ai-learning-plan-v1",
+          provider: "local_template",
+          model_name: "local-template-v1",
+          result_json: { summary: "General learning history summary." },
+          result_markdown: "# Snipe Learning Plan",
+          status: "completed",
+          created_at: "2026-07-13T12:05:00Z",
+        },
+      ],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    await user.upload(
+      await screen.findByLabelText(/Upload resume/i),
+      new File(["resume content"], "resume.pdf", { type: "application/pdf" }),
+    );
+    await user.type(
+      screen.getByPlaceholderText("Paste a target job description here."),
+      "Operations Analyst at Acme Logistics. Requirements include Excel, SQL, Tableau, communication, and operations reporting responsibilities.",
+    );
+    await user.click(screen.getByRole("button", { name: /Analyze job description/i }));
+    await user.click(await screen.findByRole("button", { name: /^Tailoring package$/i }));
+
+    expect(await screen.findByText("Tailoring generated for active target.")).toBeInTheDocument();
+    expect(screen.getByText("Target tailoring history summary.")).toBeInTheDocument();
+    expect(screen.getByText("General learning history summary.")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Type"), "active_target");
+    expect(screen.getByText("Target tailoring history summary.")).toBeInTheDocument();
+    expect(screen.queryByText("General learning history summary.")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/profiles/profile-id/ai/resume-tailoring-package"),
+      expect.objectContaining({
+        body: JSON.stringify({ job_description_id: "job-id", force_regenerate: false }),
+      }),
+    );
+  });
+
   it("uploads a target job description file", async () => {
     const user = userEvent.setup();
     const fetchMock = mockFetch([

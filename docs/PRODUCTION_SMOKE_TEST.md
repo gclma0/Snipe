@@ -60,3 +60,9 @@ The same smoke check can be run manually from GitHub:
 - Generated outputs are saved and reload after refresh/history load.
 - Privacy export works and does not include raw document bytes.
 - AI-provider status shows booleans only for key presence, not secret values.
+
+## Troubleshooting
+
+- If the frontend shows an API error with `Request ID: ...`, use that value to correlate the browser action with backend logs.
+- Backend responses include `X-Request-ID` and `X-Process-Time-ms` headers for support correlation and lightweight latency checks.
+- Request IDs are diagnostic metadata only; they must not include resume text, JWTs, API keys, or uploaded document contents.

@@ -51,4 +51,22 @@ describe("App", () => {
     expect(screen.getAllByText("local_template").length).toBeGreaterThan(0);
     expect(screen.queryByText(/api key value/i)).not.toBeInTheDocument();
   });
+
+  it("shows backend request IDs on API errors", async () => {
+    const user = userEvent.setup();
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ detail: "Provider configuration failed." }), {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": "req-test-123",
+        },
+      });
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /Check status/i }));
+
+    expect(await screen.findByText("Provider configuration failed. Request ID: req-test-123")).toBeInTheDocument();
+  });
 });

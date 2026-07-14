@@ -102,12 +102,25 @@ import type {
   AIProviderStatus,
 } from "./apiTypes";
 
+const REQUEST_ID_HEADER = "X-Request-ID";
+
+export class ApiError extends Error {
+  requestId: string | null;
+  status: number;
+
+  constructor(message: string, options: { requestId: string | null; status: number }) {
+    super(formatApiErrorMessage(message, options.requestId));
+    this.name = "ApiError";
+    this.requestId = options.requestId;
+    this.status = options.status;
+  }
+}
+
 async function publicRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, init);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof error.detail === "string" ? error.detail : "Request failed.");
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<T>;
@@ -123,11 +136,26 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof error.detail === "string" ? error.detail : "Request failed.");
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<T>;
+}
+
+async function apiErrorFromResponse(response: Response) {
+  const error = await response.json().catch(() => ({ detail: response.statusText }));
+  const message = typeof error.detail === "string" ? error.detail : "Request failed.";
+  return new ApiError(message, {
+    requestId: response.headers.get(REQUEST_ID_HEADER),
+    status: response.status,
+  });
+}
+
+function formatApiErrorMessage(message: string, requestId: string | null) {
+  if (!requestId) {
+    return message;
+  }
+  return `${message} Request ID: ${requestId}`;
 }
 
 export function getAIProviderStatus() {

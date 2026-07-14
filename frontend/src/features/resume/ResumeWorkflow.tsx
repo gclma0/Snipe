@@ -8,97 +8,42 @@ import { AIResultsPanel } from "@/features/resume/AIResultsPanel";
 import { ResumeUploadSummary } from "@/features/resume/ResumeUploadSummary";
 import { TargetJobForm } from "@/features/resume/TargetJobForm";
 import {
-  downloadJson,
-  downloadTextFile,
-  fullReportFilename,
-} from "@/features/resume/generatedOutputFormatting";
-import {
   GitHubValues,
-  JobDescriptionValues,
   LinkedInValues,
   PortfolioValues,
   ProfileValues,
 } from "@/features/resume/resumeWorkflowForms";
+import { useAIGeneration } from "@/features/resume/useAIGeneration";
 import { useGeneratedOutputs } from "@/features/resume/useGeneratedOutputs";
+import { useJobTargets } from "@/features/resume/useJobTargets";
+import { usePrivacyControls } from "@/features/resume/usePrivacyControls";
+import { useRagReferences } from "@/features/resume/useRagReferences";
 import { useResumeWorkflowDerivedState } from "@/features/resume/useResumeWorkflowDerivedState";
 import { useResumeWorkflowForms } from "@/features/resume/useResumeWorkflowForms";
 import {
-  BasicReportResult,
-  AIInterpretationResult,
-  ApplicationMaterialsResult,
-  AnswerEvaluationResult,
-  CareerTransitionResult,
   CandidateProfile,
-  ClaimVerificationResult,
   DeterministicScoreResult,
-  FullCareerReportResult,
   GitHubSourceResult,
+  ApplicationMaterialsResult,
   InterviewPrepResult,
-  JobDescriptionResult,
-  JobMatch,
-  JobMatchResult,
-  SavedJobMatchRun,
-  LearningPlanResult,
-  LinkedInOptimizationResult,
   LinkedInSourceResult,
-  MockInterviewSession,
-  OutreachMessagePack,
   PortfolioSourceResult,
-  PrivacyDataSummaryResult,
-  PrivacyEvent,
-  RagDocumentResult,
-  RagDocumentSummary,
-  RagSearchResult,
-  RagSourceType,
-  ProjectRoadmapResult,
   ReadinessDashboardResult,
   ResumeQualityResult,
-  ResumeRewriteResult,
   ResumeTailoringPackageResult,
   ResumeUploadResult,
   SkillGapResult,
   addGitHubSource,
   addLinkedInTextSource,
   addPortfolioSource,
-  answerMockInterview,
-  createAIReadinessInterpretation,
-  createApplicationMaterials,
-  createBasicReport,
-  createCareerTransitionAnalysis,
-  createClaimVerificationQuestions,
-  createFullReport,
-  createInterviewPrep,
-  createLearningPlan,
-  createLinkedInOptimization,
-  createOutreachMessagePack,
-  createJobDescription,
-  createProjectRoadmap,
-  createRagDocument,
-  createResumeRewriteSuggestions,
-  createResumeTailoringPackage,
   createProfile,
   deleteProfileData,
-  deleteProfileDocuments,
-  deleteRagDocument,
-  exportProfileData,
-  getPrivacyDataSummary,
-  getSavedJobMatch,
-  listJobDescriptions,
-  listPrivacyEvents,
-  listSavedJobMatches,
   listProfiles,
-  listRagDocuments,
   runAtsReadinessAnalysis,
-  runJobMatches,
   runProfileCompletenessAnalysis,
   runReadinessDashboard,
   runResumeQualityAnalysis,
   runSkillGapAnalysis,
-  replaceRagDocument,
-  searchJobRagReferences,
-  searchRagReferences,
-  startMockInterview,
-  uploadJobDescription,
   uploadLinkedInSource,
   uploadResume,
 } from "@/lib/api";
@@ -113,55 +58,16 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [qualityResult, setQualityResult] = useState<ResumeQualityResult | null>(null);
   const [atsResult, setAtsResult] = useState<DeterministicScoreResult | null>(null);
   const [completenessResult, setCompletenessResult] = useState<DeterministicScoreResult | null>(null);
-  const [jobResult, setJobResult] = useState<JobDescriptionResult | null>(null);
-  const [jobOptions, setJobOptions] = useState<JobDescriptionResult[]>([]);
   const [githubResult, setGithubResult] = useState<GitHubSourceResult | null>(null);
   const [portfolioResult, setPortfolioResult] = useState<PortfolioSourceResult | null>(null);
   const [linkedInResult, setLinkedInResult] = useState<LinkedInSourceResult | null>(null);
   const [skillGapResult, setSkillGapResult] = useState<SkillGapResult | null>(null);
-  const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
-  const [savedJobMatches, setSavedJobMatches] = useState<SavedJobMatchRun[]>([]);
-  const [jobMatchTargetIds, setJobMatchTargetIds] = useState<Record<string, string>>({});
   const [dashboardResult, setDashboardResult] = useState<ReadinessDashboardResult | null>(null);
-  const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
-  const [fullReportResult, setFullReportResult] = useState<FullCareerReportResult | null>(null);
-  const [privacySummary, setPrivacySummary] = useState<PrivacyDataSummaryResult | null>(null);
-  const [privacyEvents, setPrivacyEvents] = useState<PrivacyEvent[]>([]);
-  const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
-  const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
-  const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
-  const [interviewResult, setInterviewResult] = useState<InterviewPrepResult | null>(null);
-  const [claimVerificationResult, setClaimVerificationResult] = useState<ClaimVerificationResult | null>(null);
-  const [mockInterviewSession, setMockInterviewSession] = useState<MockInterviewSession | null>(null);
-  const [mockInterviewEvaluation, setMockInterviewEvaluation] = useState<AnswerEvaluationResult | null>(null);
-  const [mockInterviewAnswer, setMockInterviewAnswer] = useState("");
-  const [outreachResult, setOutreachResult] = useState<OutreachMessagePack | null>(null);
-  const [careerTransitionResult, setCareerTransitionResult] = useState<CareerTransitionResult | null>(null);
-  const [projectRoadmapResult, setProjectRoadmapResult] = useState<ProjectRoadmapResult | null>(null);
-  const [learningPlanResult, setLearningPlanResult] = useState<LearningPlanResult | null>(null);
-  const [linkedInOptimizationResult, setLinkedInOptimizationResult] = useState<LinkedInOptimizationResult | null>(null);
-  const [applicationMaterialsResult, setApplicationMaterialsResult] = useState<ApplicationMaterialsResult | null>(null);
-  const [ragDocumentResult, setRagDocumentResult] = useState<RagDocumentResult | null>(null);
-  const [ragDocuments, setRagDocuments] = useState<RagDocumentSummary[]>([]);
-  const [editingRagDocument, setEditingRagDocument] = useState<RagDocumentSummary | null>(null);
-  const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
-  const [jobRagSearchResult, setJobRagSearchResult] = useState<RagSearchResult | null>(null);
-  const [deletingRagDocumentId, setDeletingRagDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
-  const [isJobMatchHistoryLoading, setIsJobMatchHistoryLoading] = useState(false);
   const [deleteResumeAfterParsing, setDeleteResumeAfterParsing] = useState(false);
   const [deleteLinkedInAfterParsing, setDeleteLinkedInAfterParsing] = useState(false);
-  const [jobMatchQuery, setJobMatchQuery] = useState("");
-  const [jobMatchLimit, setJobMatchLimit] = useState(10);
-  const [ragTitle, setRagTitle] = useState("");
-  const [ragSourceType, setRagSourceType] = useState<RagSourceType>("job_listing");
-  const [ragSourceUrl, setRagSourceUrl] = useState("");
-  const [ragText, setRagText] = useState("");
-  const [ragQuery, setRagQuery] = useState("");
-  const [ragLimit, setRagLimit] = useState(5);
-  const [ragSearchSourceTypes, setRagSearchSourceTypes] = useState<RagSourceType[]>([]);
   const {
     profileForm: form,
     jobForm,
@@ -192,11 +98,155 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     profileId: profile?.id ?? null,
     onMessage: setMessage,
   });
+  const {
+    handleDeleteDocumentsOnly,
+    handleExportProfileData,
+    handleLoadPrivacyEvents,
+    handleLoadPrivacySummary,
+    privacyEvents,
+    privacySummary,
+    resetPrivacyState,
+  } = usePrivacyControls({
+    accessToken,
+    profile,
+    onBusyChange: setIsBusy,
+    onMessage: setMessage,
+  });
+  const {
+    clearJobMatchResult,
+    clearJobTargetState,
+    handleCreateJobDescription,
+    handleLoadJobMatchHistory,
+    handleOpenSavedJobMatch,
+    handleRunJobMatches,
+    handleSaveJobMatchAndGenerate,
+    handleSaveJobMatchAsTarget,
+    handleSelectJobDescription,
+    handleUploadJobDescription,
+    isJobMatchHistoryLoading,
+    jobMatchLimit,
+    jobMatchQuery,
+    jobMatchResult,
+    jobMatchTargetIds,
+    jobOptions,
+    jobResult,
+    loadJobDescriptionsForProfile,
+    savedJobMatches,
+    setJobMatchLimit,
+    setJobMatchQuery,
+    setJobResult,
+    setLoadedJobDescriptions,
+  } = useJobTargets({
+    accessToken,
+    profile,
+    onBusyChange: setIsBusy,
+    onBusyLabelChange: setBusyLabel,
+    onMessage: setMessage,
+    onResetTargetDependentResults: resetTargetDependentResults,
+    onApplicationMaterialsResult: handleJobApplicationMaterialsResult,
+    onInterviewResult: handleJobInterviewResult,
+    onTailoringResult: handleJobTailoringResult,
+    refreshGeneratedOutputs,
+  });
+  const {
+    aiInterpretationResult,
+    applicationMaterialsResult,
+    careerTransitionResult,
+    claimVerificationResult,
+    fullReportResult,
+    handleCreateAIInterpretation,
+    handleCreateApplicationMaterials,
+    handleCreateCareerTransition,
+    handleCreateClaimVerification,
+    handleCreateFullReport,
+    handleCreateInterviewPrep,
+    handleCreateLearningPlan,
+    handleCreateLinkedInOptimization,
+    handleCreateOutreachPack,
+    handleCreateProjectRoadmap,
+    handleCreateReport,
+    handleCreateRewriteSuggestions,
+    handleCreateTailoringPackage,
+    handleDownloadFullReport,
+    handleStartMockInterview,
+    handleSubmitMockAnswer,
+    interviewResult,
+    learningPlanResult,
+    linkedInOptimizationResult,
+    mockInterviewAnswer,
+    mockInterviewEvaluation,
+    mockInterviewSession,
+    outreachResult,
+    projectRoadmapResult,
+    reportResult,
+    resetAiResults,
+    resetReportResults,
+    rewriteResult,
+    setApplicationMaterialsResult,
+    setInterviewResult,
+    setMockInterviewAnswer,
+    setTailoringResult,
+    tailoringResult,
+  } = useAIGeneration({
+    accessToken,
+    profile,
+    jobResult,
+    onBusyChange: setIsBusy,
+    onBusyLabelChange: setBusyLabel,
+    onMessage: setMessage,
+    refreshGeneratedOutputs,
+  });
+  const {
+    deletingRagDocumentId,
+    editingRagDocument,
+    handleCancelEditRagDocument,
+    handleDeleteRagDocument,
+    handleEditRagDocument,
+    handleIngestRagReference,
+    handleLoadRagDocuments,
+    handleReplaceRagDocument,
+    handleSearchJobRagReferences,
+    handleSearchRagReferences,
+    jobRagSearchResult,
+    ragDocumentResult,
+    ragDocuments,
+    ragLimit,
+    ragQuery,
+    ragSearchResult,
+    ragSearchSourceTypes,
+    ragSourceType,
+    ragSourceUrl,
+    ragText,
+    ragTitle,
+    setRagLimit,
+    setRagQuery,
+    setRagSearchSourceTypes,
+    setRagSourceType,
+    setRagSourceUrl,
+    setRagText,
+    setRagTitle,
+  } = useRagReferences({
+    accessToken,
+    onBusyChange: setIsBusy,
+    onMessage: setMessage,
+  });
   const { activeTargetLabel, filteredGeneratedOutputs } = useResumeWorkflowDerivedState({
     generatedOutputFilter,
     generatedOutputs,
     jobResult,
   });
+
+  function handleJobApplicationMaterialsResult(result: ApplicationMaterialsResult) {
+    setApplicationMaterialsResult(result);
+  }
+
+  function handleJobInterviewResult(result: InterviewPrepResult) {
+    setInterviewResult(result);
+  }
+
+  function handleJobTailoringResult(result: ResumeTailoringPackageResult) {
+    setTailoringResult(result);
+  }
 
   function resetOptionalSourceResults() {
     setGithubResult(null);
@@ -204,37 +254,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setLinkedInResult(null);
   }
 
-  function resetPrivacyState() {
-    setPrivacySummary(null);
-    setPrivacyEvents([]);
-  }
-
-  function resetAiResults() {
-    setAiInterpretationResult(null);
-    setRewriteResult(null);
-    setTailoringResult(null);
-    setInterviewResult(null);
-    setClaimVerificationResult(null);
-    setMockInterviewSession(null);
-    setMockInterviewEvaluation(null);
-    setMockInterviewAnswer("");
-    setOutreachResult(null);
-    setCareerTransitionResult(null);
-    setProjectRoadmapResult(null);
-    setLearningPlanResult(null);
-    setLinkedInOptimizationResult(null);
-    setApplicationMaterialsResult(null);
-  }
-
   function resetAnalysisResults() {
     setQualityResult(null);
     setAtsResult(null);
     setCompletenessResult(null);
     setSkillGapResult(null);
-    setJobMatchResult(null);
+    clearJobMatchResult();
     setDashboardResult(null);
-    setReportResult(null);
-    setFullReportResult(null);
+    resetReportResults();
   }
 
   function resetProfileDependentResults() {
@@ -248,11 +275,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   function resetTargetDependentResults(options: { clearGeneratedOutputs?: boolean; clearJobMatches?: boolean } = {}) {
     setSkillGapResult(null);
     if (options.clearJobMatches) {
-      setJobMatchResult(null);
+      clearJobMatchResult();
     }
     setDashboardResult(null);
-    setReportResult(null);
-    setFullReportResult(null);
+    resetReportResults();
     resetAiResults();
     if (options.clearGeneratedOutputs) {
       resetGeneratedOutputHistory();
@@ -273,8 +299,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const created = await createProfile(accessToken, values);
       setProfile(created);
       setUploadResult(null);
-      setJobResult(null);
-      setJobOptions([]);
+      clearJobTargetState();
       resetProfileDependentResults();
       setMessage("Profile created.");
     } catch (error) {
@@ -300,167 +325,18 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       }
 
       const outputs = await loadGeneratedOutputsForProfile(accessToken, latestProfile.id);
-      const jobs = await listJobDescriptions(accessToken, latestProfile.id);
+      const jobs = await loadJobDescriptionsForProfile(accessToken, latestProfile.id);
       setProfile(latestProfile);
       setUploadResult(null);
       setJobResult(null);
-      setJobOptions(jobs);
       resetProfileDependentResults();
       setLoadedGeneratedOutputs(outputs);
+      setLoadedJobDescriptions(jobs);
       setMessage(outputs.length ? "Latest profile and saved outputs loaded." : "Latest profile loaded. No saved outputs found yet.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load latest profile.");
     } finally {
       setIsBusy(false);
-    }
-  }
-
-  async function handleCreateJobDescription(values: JobDescriptionValues) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await createJobDescription(accessToken, profile.id, values.text);
-      setJobResult(result);
-      setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
-      resetTargetDependentResults({ clearGeneratedOutputs: true, clearJobMatches: true });
-      setMessage("Job description analyzed.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleUploadJobDescription(event: React.ChangeEvent<HTMLInputElement>) {
-    if (!accessToken || !profile) {
-      return;
-    }
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await uploadJobDescription(accessToken, profile.id, file);
-      setJobResult(result);
-      setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
-      resetTargetDependentResults({ clearGeneratedOutputs: true, clearJobMatches: true });
-      setMessage("Job description upload analyzed.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not upload job description.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  function handleSelectJobDescription(jobId: string) {
-    const selected = jobOptions.find((job) => job.id === jobId) ?? null;
-    setJobResult(selected);
-    resetTargetDependentResults();
-    setMessage(selected ? "Saved target job selected." : "Target job selection cleared.");
-  }
-
-  async function saveJobMatchAsTarget(match: JobMatch) {
-    if (!accessToken || !profile) {
-      return null;
-    }
-
-    const existingTargetId = jobMatchTargetIds[match.job_reference_id];
-    if (existingTargetId && jobResult?.id === existingTargetId) {
-      return jobResult;
-    }
-
-    const existingTarget = existingTargetId
-      ? jobOptions.find((job) => job.id === existingTargetId) ?? null
-      : null;
-    if (existingTarget) {
-      setJobResult(existingTarget);
-      resetTargetDependentResults();
-      return existingTarget;
-    }
-
-    if (match.source_excerpt.trim().length < 100) {
-      setMessage("This job match does not include enough source text to save as a target job.");
-      return null;
-    }
-
-    const result = await createJobDescription(accessToken, profile.id, match.source_excerpt);
-    setJobResult(result);
-    setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
-    if (result.id) {
-      setJobMatchTargetIds((current) => ({
-        ...current,
-        [match.job_reference_id]: result.id ?? "",
-      }));
-    }
-    resetTargetDependentResults();
-    return result;
-  }
-
-  async function handleSaveJobMatchAsTarget(match: JobMatch) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await saveJobMatchAsTarget(match);
-      if (result) {
-        setMessage("Job match saved as the active target job.");
-      }
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save job match as target.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleSaveJobMatchAndGenerate(
-    match: JobMatch,
-    outputType: "tailoring" | "interview" | "materials",
-  ) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    const labels = {
-      tailoring: "tailoring package",
-      interview: "interview prep",
-      materials: "application materials",
-    };
-    setIsBusy(true);
-    setBusyLabel(`Saving match and generating ${labels[outputType]}...`);
-    setMessage(null);
-    try {
-      const targetJob = await saveJobMatchAsTarget(match);
-      if (!targetJob?.id) {
-        return;
-      }
-      if (outputType === "tailoring") {
-        const result = await createResumeTailoringPackage(accessToken, profile.id, targetJob.id, false);
-        setTailoringResult(result);
-      } else if (outputType === "interview") {
-        const result = await createInterviewPrep(accessToken, profile.id, targetJob.id, false);
-        setInterviewResult(result);
-      } else {
-        const result = await createApplicationMaterials(accessToken, profile.id, targetJob.id, false);
-        setApplicationMaterialsResult(result);
-      }
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(`Job match saved and ${labels[outputType]} generated.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : `Could not generate ${labels[outputType]}.`);
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
     }
   }
 
@@ -583,471 +459,13 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       await deleteProfileData(accessToken, profile.id);
       setProfile(null);
       setUploadResult(null);
-      setJobResult(null);
-      setJobOptions([]);
+      clearJobTargetState();
       resetProfileDependentResults();
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");
     } finally {
       setIsBusy(false);
-    }
-  }
-
-  async function handleLoadPrivacySummary() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await getPrivacyDataSummary(accessToken, profile.id);
-      setPrivacySummary(result);
-      setMessage("Privacy summary loaded.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load privacy summary.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleExportProfileData() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await exportProfileData(accessToken, profile.id);
-      downloadJson(`snipe-profile-export-${profile.id}.json`, result);
-      setPrivacyEvents(result.privacy_events);
-      setMessage("Profile data export generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not export profile data.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleLoadPrivacyEvents() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await listPrivacyEvents(accessToken, profile.id);
-      setPrivacyEvents(result);
-      setMessage(result.length ? "Privacy events loaded." : "No privacy events found yet.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load privacy events.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleDeleteDocumentsOnly() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await deleteProfileDocuments(accessToken, profile.id);
-      setMessage(`Deleted ${result.deleted_storage_objects} stored document object(s).`);
-      await handleLoadPrivacySummary();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not delete stored documents.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleCreateReport() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Generating basic report...");
-    setMessage(null);
-    try {
-      const result = await createBasicReport(accessToken, profile.id, jobResult?.id ?? null);
-      setReportResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage("Basic report generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate report.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateFullReport() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Generating full career report...");
-    setMessage(null);
-    try {
-      const result = await createFullReport(accessToken, profile.id, jobResult?.id ?? null);
-      setFullReportResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage("Full career report generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate full report.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  function handleDownloadFullReport() {
-    if (!fullReportResult) {
-      return;
-    }
-
-    downloadTextFile(
-      fullReportFilename(fullReportResult),
-      fullReportResult.markdown,
-      "text/markdown;charset=utf-8",
-    );
-    setMessage("Full report downloaded.");
-  }
-
-  async function handleCreateAIInterpretation(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating AI interpretation..." : "Generating AI interpretation...");
-    setMessage(null);
-    try {
-      const result = await createAIReadinessInterpretation(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setAiInterpretationResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "AI interpretation loaded from cache." : "AI interpretation generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate AI interpretation.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateRewriteSuggestions(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating rewrite suggestions..." : "Generating rewrite suggestions...");
-    setMessage(null);
-    try {
-      const result = await createResumeRewriteSuggestions(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setRewriteResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Rewrite suggestions loaded from cache." : "Rewrite suggestions generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate rewrite suggestions.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateTailoringPackage(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating tailoring package..." : "Generating tailoring package...");
-    setMessage(null);
-    try {
-      const result = await createResumeTailoringPackage(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setTailoringResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Tailoring package loaded from cache." : "Tailoring package generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate tailoring package.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateInterviewPrep(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating interview prep..." : "Generating interview prep...");
-    setMessage(null);
-    try {
-      const result = await createInterviewPrep(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setInterviewResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Interview prep loaded from cache." : "Interview prep generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate interview prep.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateClaimVerification(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating claim questions..." : "Generating claim questions...");
-    setMessage(null);
-    try {
-      const result = await createClaimVerificationQuestions(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setClaimVerificationResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Claim questions loaded from cache." : "Claim questions generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate claim questions.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleStartMockInterview() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Starting mock interview...");
-    setMessage(null);
-    try {
-      const result = await startMockInterview(accessToken, profile.id, jobResult?.id ?? null, 5);
-      setMockInterviewSession(result);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setMessage("Mock interview started.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not start mock interview.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleSubmitMockAnswer() {
-    if (!accessToken || !profile || !mockInterviewSession || !mockInterviewAnswer.trim()) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Evaluating interview answer...");
-    setMessage(null);
-    try {
-      const result = await answerMockInterview(
-        accessToken,
-        profile.id,
-        mockInterviewSession,
-        mockInterviewAnswer,
-      );
-      setMockInterviewSession(result.session);
-      setMockInterviewEvaluation(result.evaluation);
-      setMockInterviewAnswer("");
-      setMessage(result.session.status === "completed" ? "Mock interview completed." : "Answer evaluated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not evaluate answer.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateOutreachPack() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Generating outreach messages...");
-    setMessage(null);
-    try {
-      const result = await createOutreachMessagePack(accessToken, profile.id, jobResult?.id ?? null);
-      setOutreachResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Outreach messages loaded from cache." : "Outreach messages generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate outreach messages.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateCareerTransition() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Generating career transition analysis...");
-    setMessage(null);
-    try {
-      const result = await createCareerTransitionAnalysis(accessToken, profile.id, jobResult?.id ?? null);
-      setCareerTransitionResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Career transition loaded from cache." : "Career transition generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate career transition analysis.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateProjectRoadmap(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating project roadmap..." : "Generating project roadmap...");
-    setMessage(null);
-    try {
-      const result = await createProjectRoadmap(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setProjectRoadmapResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Project roadmap loaded from cache." : "Project roadmap generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate project roadmap.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateApplicationMaterials(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating application materials..." : "Generating application materials...");
-    setMessage(null);
-    try {
-      const result = await createApplicationMaterials(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setApplicationMaterialsResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(
-        result.cached ? "Application materials loaded from cache." : "Application materials generated.",
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate application materials.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateLearningPlan(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating learning plan..." : "Generating learning plan...");
-    setMessage(null);
-    try {
-      const result = await createLearningPlan(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setLearningPlanResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(result.cached ? "Learning plan loaded from cache." : "Learning plan generated.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate learning plan.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleCreateLinkedInOptimization(forceRegenerate = false) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel(forceRegenerate ? "Regenerating LinkedIn optimization..." : "Generating LinkedIn optimization...");
-    setMessage(null);
-    try {
-      const result = await createLinkedInOptimization(
-        accessToken,
-        profile.id,
-        jobResult?.id ?? null,
-        forceRegenerate,
-      );
-      setLinkedInOptimizationResult(result);
-      await refreshGeneratedOutputs(accessToken, profile.id);
-      setMessage(
-        result.cached ? "LinkedIn optimization loaded from cache." : "LinkedIn optimization generated.",
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate LinkedIn optimization.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
     }
   }
 
@@ -1066,74 +484,6 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage(error instanceof Error ? error.message : "Could not run readiness dashboard.");
     } finally {
       setIsBusy(false);
-    }
-  }
-
-  async function handleRunJobMatches() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsBusy(true);
-    setBusyLabel("Retrieving and ranking job matches...");
-    setMessage(null);
-    try {
-      const result = await runJobMatches(
-        accessToken,
-        profile.id,
-        jobMatchQuery.trim() || profile.preferred_role,
-        jobMatchLimit,
-      );
-      setJobMatchResult(result);
-      const savedRuns = await listSavedJobMatches(accessToken, profile.id);
-      setSavedJobMatches(savedRuns);
-      setMessage(result.matches.length ? "Job matches ranked." : "No job references found yet.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not retrieve job matches.");
-    } finally {
-      setIsBusy(false);
-      setBusyLabel(null);
-    }
-  }
-
-  async function handleLoadJobMatchHistory() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsJobMatchHistoryLoading(true);
-    setMessage(null);
-    try {
-      const runs = await listSavedJobMatches(accessToken, profile.id);
-      setSavedJobMatches(runs);
-      setMessage(runs.length ? "Job match history loaded." : "No saved job matches found yet.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load job match history.");
-    } finally {
-      setIsJobMatchHistoryLoading(false);
-    }
-  }
-
-  async function handleOpenSavedJobMatch(analysisId: string) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsJobMatchHistoryLoading(true);
-    setMessage(null);
-    try {
-      const run = await getSavedJobMatch(accessToken, profile.id, analysisId);
-      setJobMatchResult(run.result);
-      setJobMatchQuery(run.query);
-      setSavedJobMatches((current) => [
-        run,
-        ...current.filter((item) => item.id !== run.id),
-      ]);
-      setMessage("Saved job match opened.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not open saved job match.");
-    } finally {
-      setIsJobMatchHistoryLoading(false);
     }
   }
 
@@ -1190,173 +540,6 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Resume quality analysis completed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not run resume analysis.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleIngestRagReference() {
-    if (!accessToken) {
-      return;
-    }
-
-    if (!ragTitle.trim() || ragText.trim().length < 100) {
-      setMessage("Reference title and at least 100 characters of text are required.");
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await createRagDocument(accessToken, {
-        title: ragTitle.trim(),
-        source_type: ragSourceType,
-        source_url: ragSourceUrl.trim() || null,
-        text: ragText.trim(),
-      });
-      setRagDocumentResult(result);
-      setRagQuery((current) => current || result.title);
-      const documents = await listRagDocuments(accessToken);
-      setRagDocuments(documents);
-      setMessage("Reference added to the library.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not add reference.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleLoadRagDocuments() {
-    if (!accessToken) {
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const documents = await listRagDocuments(accessToken);
-      setRagDocuments(documents);
-      setMessage(documents.length ? "References loaded." : "No saved references found yet.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load references.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleDeleteRagDocument(documentId: string) {
-    if (!accessToken) {
-      return;
-    }
-
-    setDeletingRagDocumentId(documentId);
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await deleteRagDocument(accessToken, documentId);
-      setRagDocuments((current) => current.filter((item) => item.document_id !== result.document_id));
-      setMessage("Reference deleted.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not delete reference.");
-    } finally {
-      setDeletingRagDocumentId(null);
-      setIsBusy(false);
-    }
-  }
-
-  function handleEditRagDocument(document: RagDocumentSummary) {
-    setEditingRagDocument(document);
-    setRagTitle(document.title);
-    setRagSourceType(document.source_type);
-    setRagSourceUrl(document.source_url ?? "");
-    setRagText("");
-    setMessage("Paste the updated reference text, then replace the selected reference.");
-  }
-
-  function handleCancelEditRagDocument() {
-    setEditingRagDocument(null);
-    setMessage("Reference edit canceled.");
-  }
-
-  async function handleReplaceRagDocument() {
-    if (!accessToken || !editingRagDocument) {
-      return;
-    }
-
-    if (!ragTitle.trim() || ragText.trim().length < 100) {
-      setMessage("Reference title and at least 100 characters of replacement text are required.");
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await replaceRagDocument(accessToken, editingRagDocument.document_id, {
-        title: ragTitle.trim(),
-        source_type: ragSourceType,
-        source_url: ragSourceUrl.trim() || null,
-        text: ragText.trim(),
-      });
-      setRagDocumentResult(result);
-      const documents = await listRagDocuments(accessToken);
-      setRagDocuments(documents);
-      setEditingRagDocument(null);
-      setMessage("Reference replaced.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not replace reference.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleSearchRagReferences() {
-    if (!accessToken) {
-      return;
-    }
-
-    if (ragQuery.trim().length < 2) {
-      setMessage("Enter at least 2 characters to search references.");
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await searchRagReferences(accessToken, {
-        query: ragQuery.trim(),
-        source_types: ragSearchSourceTypes,
-        limit: ragLimit,
-      });
-      setRagSearchResult(result);
-      setMessage(result.citations.length ? "References searched." : "No matching references found.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not search references.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleSearchJobRagReferences() {
-    if (!accessToken) {
-      return;
-    }
-
-    if (ragQuery.trim().length < 2) {
-      setMessage("Enter at least 2 characters to search job references.");
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage(null);
-    try {
-      const result = await searchJobRagReferences(accessToken, {
-        query: ragQuery.trim(),
-        limit: ragLimit,
-      });
-      setJobRagSearchResult(result);
-      setMessage(result.citations.length ? "Job references searched." : "No matching job references found.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not search job references.");
     } finally {
       setIsBusy(false);
     }

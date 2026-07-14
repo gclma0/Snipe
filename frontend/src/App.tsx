@@ -19,14 +19,15 @@ export function App() {
             <Activity aria-hidden="true" className="h-5 w-5" />
           </div>
           <p className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Milestone 2 scaffold
+            Career intelligence workspace
           </p>
           <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
             Snipe
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
-            Frontend tooling is ready. Product workflows begin in later milestones after
-            authentication, storage, and the normalized candidate profile are in place.
+            Build one evidence-backed candidate profile, compare it against target roles,
+            generate tailored career materials, and keep saved outputs reusable without
+            resending raw documents.
           </p>
           <AuthPanel onTokenChange={handleTokenChange} />
           <AIProviderStatusPanel />

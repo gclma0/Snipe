@@ -12,10 +12,12 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("renders the scaffold shell", () => {
+  it("renders the product shell", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: /Snipe/i })).toBeInTheDocument();
+    expect(screen.getByText(/Career intelligence workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/evidence-backed candidate profile/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Supabase authentication/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /AI provider/i })).toBeInTheDocument();
   });

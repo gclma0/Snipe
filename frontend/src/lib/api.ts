@@ -58,6 +58,7 @@ export type {
   RagSourceType,
   AIProviderStatus,
   BackendHealthStatus,
+  UsageSummary,
 } from "./apiTypes";
 
 import type {
@@ -102,6 +103,7 @@ import type {
   RagSourceType,
   AIProviderStatus,
   BackendHealthStatus,
+  UsageSummary,
 } from "./apiTypes";
 
 const REQUEST_ID_HEADER = "X-Request-ID";
@@ -177,6 +179,10 @@ export async function getBackendHealthStatus() {
     request_id: response.headers.get(REQUEST_ID_HEADER),
     process_time_ms: response.headers.get("X-Process-Time-ms"),
   };
+}
+
+export function getUsageSummary(days = 7) {
+  return publicRequest<UsageSummary>(`/usage/summary?days=${encodeURIComponent(String(days))}`);
 }
 
 export function listProfiles(token: string) {

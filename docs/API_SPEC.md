@@ -9,6 +9,7 @@
 - Long-running or expensive AI outputs should return a job/status pattern when needed.
 - Endpoints must enforce user ownership for every profile, source, analysis, and generated output.
 - Every backend response includes `X-Request-ID` for support correlation and `X-Process-Time-ms` for lightweight timing diagnostics. A caller-supplied `X-Request-ID` is preserved when valid.
+- Public health and usage endpoints are rate limited. Limited responses return `429`, `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 
 ## Health
 
@@ -375,6 +376,42 @@ Body:
 The endpoint must not receive or store resume text, job-description text,
 generated AI output, uploaded document content, source URLs, emails, API keys,
 JWTs, `user_id`, or `profile_id`.
+
+### GET `/usage/summary`
+
+Returns anonymous aggregate product usage counts for a bounded recent window.
+
+Query parameters:
+
+- `days`: optional integer from 1 to 90. Defaults to 7.
+
+Response:
+
+- `days`.
+- `total_events`.
+- `event_counts`: event-name counts only.
+- `surface_counts`: surface-name counts only.
+
+The response must not include event rows, anonymous session IDs, user IDs,
+profile IDs, metadata payloads, source URLs, or raw user content.
+
+## Public Rate Limiting
+
+Rate limiting applies to:
+
+- `GET /health`.
+- `GET /health/ai-provider`.
+- `POST /usage/events`.
+- `GET /usage/summary`.
+
+Configuration:
+
+- `PUBLIC_RATE_LIMIT_ENABLED`.
+- `PUBLIC_RATE_LIMIT_REQUESTS`.
+- `PUBLIC_RATE_LIMIT_WINDOW_SECONDS`.
+
+The limiter is an in-memory per-process guard intended for free-tier abuse
+reduction. It is not a replacement for a distributed production edge limiter.
 
 ## Admin Or Internal Endpoints
 

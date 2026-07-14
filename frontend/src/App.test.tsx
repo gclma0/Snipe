@@ -161,4 +161,43 @@ describe("App", () => {
     expect(screen.getByText("Sign in to test authenticated backend connectivity.")).toBeInTheDocument();
     expect(fetchCalls).toContain("http://localhost:8000/api/v1/usage/events");
   });
+
+  it("loads anonymous aggregate usage summary", async () => {
+    const user = userEvent.setup();
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/usage/summary")) {
+        return new Response(
+          JSON.stringify({
+            days: 7,
+            total_events: 4,
+            event_counts: [
+              { name: "system_diagnostics_checked", count: 2 },
+              { name: "production_smoke_test_ran", count: 1 },
+            ],
+            surface_counts: [{ name: "system_panel", count: 3 }],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ accepted: true, event_name: "usage_summary_loaded" }), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /Load usage summary/i }));
+
+    expect(await screen.findByText("Usage summary")).toBeInTheDocument();
+    expect(screen.getByText("Last 7 days")).toBeInTheDocument();
+    expect(screen.getByText("4 aggregate events recorded.")).toBeInTheDocument();
+    expect(screen.getByText("system_diagnostics_checked")).toBeInTheDocument();
+    expect(screen.queryByText(/profile_id/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/anonymous_session_id/i)).not.toBeInTheDocument();
+  });
 });

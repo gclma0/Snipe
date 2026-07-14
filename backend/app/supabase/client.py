@@ -724,6 +724,30 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def list_usage_events_for_summary(
+        self,
+        *,
+        since_iso: str,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=10, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/usage_events",
+                headers=self.headers,
+                params={
+                    "select": "event_name,surface",
+                    "created_at": f"gte.{since_iso}",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Usage event summary failed: {response.text[:300]}",
+                operation="usage_event_summary",
+            )
+        return response.json()
+
     def list_privacy_events(
         self,
         *,

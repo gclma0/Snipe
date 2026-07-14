@@ -77,6 +77,9 @@ Deployment:
 - `docs/DEVELOPMENT_PLAN.md`: sequential milestones with acceptance criteria.
 - `docs/DECISIONS.md`: architectural decisions and reasons.
 - `docs/LOCAL_DEVELOPMENT.md`: local install, run, and verification commands.
+- `docs/PRODUCTION_SMOKE_TEST.md`: production smoke-test checklist and automation.
+- `docs/OPERATIONS.md`: production operations, troubleshooting, rate-limit tuning, and support runbook.
+- `docs/LAUNCH_READINESS.md`: current launch-readiness status, blockers, risks, and next work.
 
 ## Development Guidance
 

@@ -16,6 +16,7 @@ from app.api.routes.reports import router as reports_router
 from app.api.routes.sources import router as sources_router
 from app.api.routes.usage import router as usage_router
 from app.core.config import Settings, get_settings
+from app.core.rate_limit import PublicEndpointRateLimitMiddleware
 from app.core.request_context import RequestContextMiddleware
 
 
@@ -28,6 +29,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc" if active_settings.enable_docs else None,
     )
     app.state.settings = active_settings
+    app.add_middleware(
+        PublicEndpointRateLimitMiddleware,
+        enabled=active_settings.public_rate_limit_enabled,
+        max_requests=active_settings.public_rate_limit_requests,
+        window_seconds=active_settings.public_rate_limit_window_seconds,
+    )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

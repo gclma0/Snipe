@@ -1,6 +1,7 @@
 from typing import Any
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.supabase.client import SupabaseClient, SupabaseError
@@ -58,6 +59,18 @@ class UsageEventResponse(BaseModel):
     event_name: str
 
 
+class UsageCount(BaseModel):
+    name: str
+    count: int = Field(ge=0)
+
+
+class UsageSummaryResponse(BaseModel):
+    days: int = Field(ge=1)
+    total_events: int = Field(ge=0)
+    event_counts: list[UsageCount]
+    surface_counts: list[UsageCount]
+
+
 @router.post("/events", response_model=UsageEventResponse, status_code=status.HTTP_202_ACCEPTED)
 def create_usage_event(
     request: UsageEventRequest,
@@ -78,6 +91,28 @@ def create_usage_event(
             detail=f"Supabase {exc.operation} failed.",
         ) from exc
     return UsageEventResponse(accepted=True, event_name=request.event_name)
+
+
+@router.get("/summary", response_model=UsageSummaryResponse)
+def get_usage_summary(
+    days: int = Query(default=7, ge=1, le=90),
+    supabase: SupabaseClient = Supabase,
+) -> UsageSummaryResponse:
+    since = datetime.now(UTC) - timedelta(days=days)
+    try:
+        rows = supabase.list_usage_events_for_summary(since_iso=since.isoformat(), limit=1000)
+    except SupabaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Supabase {exc.operation} failed.",
+        ) from exc
+
+    return UsageSummaryResponse(
+        days=days,
+        total_events=len(rows),
+        event_counts=_count_by_key(rows, "event_name"),
+        surface_counts=_count_by_key(rows, "surface"),
+    )
 
 
 def sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str | int | float | bool | None]:
@@ -111,3 +146,14 @@ def _sanitize_metadata_value(value: Any) -> str | int | float | bool | None:
     if isinstance(value, str):
         return value.strip()[:MAX_METADATA_STRING_LENGTH]
     return None
+
+
+def _count_by_key(rows: list[dict[str, Any]], key: str) -> list[UsageCount]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        name = str(row.get(key) or "unknown")
+        counts[name] = counts.get(name, 0) + 1
+    return [
+        UsageCount(name=name, count=count)
+        for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]

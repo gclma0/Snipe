@@ -14,6 +14,18 @@ export type BackendHealthStatus = {
   process_time_ms: string | null;
 };
 
+export type UsageCount = {
+  name: string;
+  count: number;
+};
+
+export type UsageSummary = {
+  days: number;
+  total_events: number;
+  event_counts: UsageCount[];
+  surface_counts: UsageCount[];
+};
+
 export type ResumeUploadResult = {
   source_id: string | null;
   profile_id: string;

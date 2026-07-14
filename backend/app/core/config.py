@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     ai_base_url: str | None = None
     ai_timeout_seconds: int = Field(default=30, ge=1, le=120)
     github_token: str | None = None
+    public_rate_limit_enabled: bool = True
+    public_rate_limit_requests: int = Field(default=60, ge=1, le=1000)
+    public_rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
 
     @property
     def cors_origins(self) -> list[str]:

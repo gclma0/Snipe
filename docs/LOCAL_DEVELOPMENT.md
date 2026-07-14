@@ -75,6 +75,9 @@ Copy-Item E:\AI\frontend\.env.example E:\AI\frontend\.env
 
 Supabase and AI provider values are placeholders until the relevant milestones begin.
 
+Only commit `.env.example` files. Actual `.env` files are ignored by git and
+must contain local or deployment-specific values only.
+
 ## Production Smoke Check
 
 After deployment, run:

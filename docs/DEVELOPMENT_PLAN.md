@@ -35,6 +35,10 @@ Completed hardening and polish:
 - Anonymous aggregate usage analytics now record non-content product events without storing user IDs, profile IDs, raw documents, source URLs, or generated AI outputs.
 - The frontend system diagnostics panel now verifies backend health, exposes request IDs/process timing, and checks AI provider readiness without exposing secrets.
 - An in-app production smoke test now verifies frontend Supabase configuration, browser auth session state, backend health, AI provider readiness, and authenticated backend connectivity when signed in.
+- Anonymous usage summary counts are available in the system diagnostics panel without exposing event rows, session IDs, user IDs, profile IDs, or metadata payloads.
+- Public health and usage endpoints are protected by a configurable in-memory rate limiter with standard `429` and retry headers.
+- Production operations guidance is documented in `docs/OPERATIONS.md`, including smoke checks, support triage, rate-limit tuning, deployment checks, logging rules, and escalation paths.
+- Launch readiness is summarized in `docs/LAUNCH_READINESS.md`, including current blockers, risks, validation status, and recommended next work.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

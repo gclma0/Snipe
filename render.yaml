@@ -18,3 +18,17 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: candidate-documents
+      - key: PUBLIC_RATE_LIMIT_ENABLED
+        value: "true"
+      - key: PUBLIC_RATE_LIMIT_REQUESTS
+        value: "60"
+      - key: PUBLIC_RATE_LIMIT_WINDOW_SECONDS
+        value: "60"
+      - key: AI_PROVIDER
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        sync: false

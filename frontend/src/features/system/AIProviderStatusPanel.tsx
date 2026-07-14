@@ -4,9 +4,11 @@ import { useState } from "react";
 import {
   getAIProviderStatus,
   getBackendHealthStatus,
+  getUsageSummary,
   listProfiles,
   type AIProviderStatus,
   type BackendHealthStatus,
+  type UsageSummary,
 } from "@/lib/api";
 import { isSupabaseConfigured } from "@/lib/env";
 import { supabase } from "@/lib/supabase";
@@ -26,9 +28,11 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
   const [backendStatus, setBackendStatus] = useState<BackendHealthStatus | null>(null);
   const [status, setStatus] = useState<AIProviderStatus | null>(null);
   const [smokeChecks, setSmokeChecks] = useState<SmokeCheck[]>([]);
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSmokeTesting, setIsSmokeTesting] = useState(false);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(false);
 
   async function handleCheckStatus() {
     setIsLoading(true);
@@ -113,6 +117,24 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
     }
   }
 
+  async function handleLoadUsageSummary() {
+    setIsLoadingUsage(true);
+    setMessage(null);
+    try {
+      const summary = await getUsageSummary(7);
+      setUsageSummary(summary);
+      trackUsageEvent("usage_summary_loaded", "system_panel", {
+        days: summary.days,
+        total_events: summary.total_events,
+      });
+    } catch (error) {
+      setUsageSummary(null);
+      setMessage(error instanceof Error ? error.message : "Could not load usage summary.");
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  }
+
   return (
     <section className="mt-6 border border-border bg-white p-4 text-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -123,7 +145,7 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
         <div className="flex flex-wrap gap-2">
           <button
             className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
-            disabled={isLoading || isSmokeTesting}
+            disabled={isLoading || isSmokeTesting || isLoadingUsage}
             type="button"
             onClick={handleCheckStatus}
           >
@@ -132,12 +154,21 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
           </button>
           <button
             className="inline-flex items-center justify-center gap-2 bg-foreground px-3 py-2 text-sm font-medium text-background"
-            disabled={isLoading || isSmokeTesting}
+            disabled={isLoading || isSmokeTesting || isLoadingUsage}
             type="button"
             onClick={handleRunSmokeTest}
           >
             <Activity aria-hidden="true" className="h-4 w-4" />
             {isSmokeTesting ? "Running..." : "Run smoke test"}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
+            disabled={isLoading || isSmokeTesting || isLoadingUsage}
+            type="button"
+            onClick={handleLoadUsageSummary}
+          >
+            <Activity aria-hidden="true" className="h-4 w-4" />
+            {isLoadingUsage ? "Loading..." : "Load usage summary"}
           </button>
         </div>
       </div>
@@ -197,6 +228,19 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
           </div>
         </div>
       ) : null}
+      {usageSummary ? (
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="font-semibold">Usage summary</h3>
+            <p className="text-muted-foreground">Last {usageSummary.days} days</p>
+          </div>
+          <p className="mt-2 text-muted-foreground">{usageSummary.total_events} aggregate events recorded.</p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <UsageCountList title="Events" counts={usageSummary.event_counts} />
+            <UsageCountList title="Surfaces" counts={usageSummary.surface_counts} />
+          </div>
+        </div>
+      ) : null}
       {message ? <p className="mt-3 text-sm text-red-600">{message}</p> : null}
     </section>
   );
@@ -219,4 +263,24 @@ function statusClassName(status: SmokeCheck["status"]) {
     return "font-medium text-yellow-700";
   }
   return "font-medium text-red-700";
+}
+
+function UsageCountList({ title, counts }: { title: string; counts: { name: string; count: number }[] }) {
+  return (
+    <div>
+      <h4 className="font-medium">{title}</h4>
+      {counts.length ? (
+        <ul className="mt-2 space-y-2">
+          {counts.slice(0, 5).map((item) => (
+            <li key={item.name} className="flex items-center justify-between gap-3 border border-border px-3 py-2">
+              <span className="break-all text-muted-foreground">{item.name}</span>
+              <span className="font-medium">{item.count}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-muted-foreground">No aggregate events recorded yet.</p>
+      )}
+    </div>
+  );
 }

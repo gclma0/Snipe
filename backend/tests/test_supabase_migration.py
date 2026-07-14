@@ -18,6 +18,12 @@ RAG_MIGRATION = (
     / "migrations"
     / "003_rag.sql"
 )
+PRIVACY_EVENTS_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "supabase"
+    / "migrations"
+    / "004_privacy_events.sql"
+)
 
 
 def test_initial_migration_defines_core_tables_and_storage_bucket() -> None:
@@ -75,3 +81,16 @@ def test_rag_migration_defines_vector_tables_rls_and_match_function() -> None:
     assert "rag_documents_select_own" in sql
     assert "rag_chunks_select_own" in sql
     assert "create or replace function public.match_rag_chunks" in sql
+
+
+def test_privacy_events_migration_defines_audit_table_and_rls() -> None:
+    sql = PRIVACY_EVENTS_MIGRATION.read_text(encoding="utf-8").lower()
+
+    assert "create table if not exists public.privacy_events" in sql
+    assert "event_type text not null" in sql
+    assert "metadata jsonb" in sql
+    assert "on delete set null" in sql
+    assert "alter table public.privacy_events enable row level security" in sql
+    assert "privacy_events_select_own" in sql
+    assert "privacy_events_insert_own" in sql
+    assert "auth.uid() = user_id" in sql

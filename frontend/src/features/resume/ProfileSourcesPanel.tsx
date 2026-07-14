@@ -1,4 +1,4 @@
-import { FileUp, Github, History, Linkedin, LinkIcon, Plus, ScrollText, Trash2 } from "lucide-react";
+import { Download, FileUp, Github, History, Linkedin, LinkIcon, Plus, ScrollText, Trash2 } from "lucide-react";
 import { ChangeEvent } from "react";
 import { UseFormReturn } from "react-hook-form";
 
@@ -15,6 +15,7 @@ import {
   LinkedInSourceResult,
   PortfolioSourceResult,
   PrivacyDataSummaryResult,
+  PrivacyEvent,
 } from "@/lib/api";
 
 type ProfileSourcesPanelProps = {
@@ -27,12 +28,15 @@ type ProfileSourcesPanelProps = {
   portfolioResult: PortfolioSourceResult | null;
   linkedInResult: LinkedInSourceResult | null;
   privacySummary: PrivacyDataSummaryResult | null;
+  privacyEvents: PrivacyEvent[];
   isBusy: boolean;
   onCreateProfile: (values: ProfileValues) => void;
   onLoadLatestProfile: () => void;
   onUploadResume: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeleteProfile: () => void;
   onLoadPrivacySummary: () => void;
+  onExportProfileData: () => void;
+  onLoadPrivacyEvents: () => void;
   onDeleteDocumentsOnly: () => void;
   onAddGitHub: (values: GitHubValues) => void;
   onAddPortfolio: (values: PortfolioValues) => void;
@@ -50,12 +54,15 @@ export function ProfileSourcesPanel({
   portfolioResult,
   linkedInResult,
   privacySummary,
+  privacyEvents,
   isBusy,
   onCreateProfile,
   onLoadLatestProfile,
   onUploadResume,
   onDeleteProfile,
   onLoadPrivacySummary,
+  onExportProfileData,
+  onLoadPrivacyEvents,
   onDeleteDocumentsOnly,
   onAddGitHub,
   onAddPortfolio,
@@ -100,6 +107,14 @@ export function ProfileSourcesPanel({
             <ScrollText aria-hidden="true" className="h-4 w-4" />
             Data summary
           </button>
+          <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={onExportProfileData}>
+            <Download aria-hidden="true" className="h-4 w-4" />
+            Export data
+          </button>
+          <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={onLoadPrivacyEvents}>
+            <History aria-hidden="true" className="h-4 w-4" />
+            Privacy events
+          </button>
           <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-border px-4 py-2 text-sm font-medium" disabled={isBusy} type="button" onClick={onDeleteDocumentsOnly}>
             <Trash2 aria-hidden="true" className="h-4 w-4" />
             Delete documents only
@@ -108,8 +123,25 @@ export function ProfileSourcesPanel({
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <JobField label="Stored documents" values={[String(privacySummary.stored_document_count)]} />
               <JobField label="Saved outputs" values={[String(privacySummary.generated_output_count)]} />
+              <JobField label="Privacy events" values={[String(privacySummary.privacy_event_count)]} />
               <JobField label="Retention" values={[privacySummary.retention_policy]} />
             </dl>
+          ) : null}
+          {privacyEvents.length ? (
+            <div className="mt-4 grid gap-3 text-sm">
+              <h3 className="text-base font-semibold">Privacy event history</h3>
+              {privacyEvents.map((event) => (
+                <div key={event.id ?? `${event.event_type}-${event.created_at}`} className="border border-border p-3">
+                  <p className="font-medium">{event.event_type.split("_").join(" ")}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {event.created_at ? new Date(event.created_at).toLocaleString() : "Time unavailable"}
+                  </p>
+                  <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                    {JSON.stringify(event.metadata, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}

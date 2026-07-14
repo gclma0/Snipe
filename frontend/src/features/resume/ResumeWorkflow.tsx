@@ -46,6 +46,7 @@ import {
   OutreachMessagePack,
   PortfolioSourceResult,
   PrivacyDataSummaryResult,
+  PrivacyEvent,
   RagDocumentResult,
   RagDocumentSummary,
   RagSearchResult,
@@ -81,11 +82,13 @@ import {
   deleteProfileData,
   deleteProfileDocuments,
   deleteRagDocument,
+  exportProfileData,
   getPrivacyDataSummary,
   getGeneratedOutput,
   getSavedJobMatch,
   listGeneratedOutputs,
   listJobDescriptions,
+  listPrivacyEvents,
   listSavedJobMatches,
   listProfiles,
   listRagDocuments,
@@ -127,6 +130,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [reportResult, setReportResult] = useState<BasicReportResult | null>(null);
   const [fullReportResult, setFullReportResult] = useState<FullCareerReportResult | null>(null);
   const [privacySummary, setPrivacySummary] = useState<PrivacyDataSummaryResult | null>(null);
+  const [privacyEvents, setPrivacyEvents] = useState<PrivacyEvent[]>([]);
   const [aiInterpretationResult, setAiInterpretationResult] = useState<AIInterpretationResult | null>(null);
   const [rewriteResult, setRewriteResult] = useState<ResumeRewriteResult | null>(null);
   const [tailoringResult, setTailoringResult] = useState<ResumeTailoringPackageResult | null>(null);
@@ -233,6 +237,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setFullReportResult(null);
       setPrivacySummary(null);
+      setPrivacyEvents([]);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -291,6 +296,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setFullReportResult(null);
       setPrivacySummary(null);
+      setPrivacyEvents([]);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -658,6 +664,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setFullReportResult(null);
       setPrivacySummary(null);
+      setPrivacyEvents([]);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -709,6 +716,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setReportResult(null);
       setFullReportResult(null);
       setPrivacySummary(null);
+      setPrivacyEvents([]);
       setAiInterpretationResult(null);
       setRewriteResult(null);
       setTailoringResult(null);
@@ -747,6 +755,43 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setMessage("Privacy summary loaded.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load privacy summary.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleExportProfileData() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await exportProfileData(accessToken, profile.id);
+      downloadJson(`snipe-profile-export-${profile.id}.json`, result);
+      setPrivacyEvents(result.privacy_events);
+      setMessage("Profile data export generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not export profile data.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleLoadPrivacyEvents() {
+    if (!accessToken || !profile) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      const result = await listPrivacyEvents(accessToken, profile.id);
+      setPrivacyEvents(result);
+      setMessage(result.length ? "Privacy events loaded." : "No privacy events found yet.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load privacy events.");
     } finally {
       setIsBusy(false);
     }
@@ -1586,6 +1631,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             portfolioForm={portfolioForm}
             portfolioResult={portfolioResult}
             privacySummary={privacySummary}
+            privacyEvents={privacyEvents}
             profile={profile}
             profileForm={form}
             onAddGitHub={handleAddGitHub}
@@ -1594,7 +1640,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onCreateProfile={handleCreateProfile}
             onDeleteDocumentsOnly={handleDeleteDocumentsOnly}
             onDeleteProfile={handleDeleteProfile}
+            onExportProfileData={handleExportProfileData}
             onLoadLatestProfile={handleLoadLatestProfile}
+            onLoadPrivacyEvents={handleLoadPrivacyEvents}
             onLoadPrivacySummary={handleLoadPrivacySummary}
             onUploadLinkedIn={handleUploadLinkedIn}
             onUploadResume={handleUpload}
@@ -1742,4 +1790,16 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </section>
   );
+}
+
+function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

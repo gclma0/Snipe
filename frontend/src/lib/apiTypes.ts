@@ -489,6 +489,28 @@ export type PrivacyDataSummaryResult = {
   profile_exists: boolean;
   stored_document_count: number;
   generated_output_count: number;
+  privacy_event_count: number;
+  retention_policy: string;
+};
+
+export type PrivacyEvent = {
+  id: string | null;
+  event_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+};
+
+export type ProfileDataExportResult = {
+  profile_id: string;
+  export_version: string;
+  includes_raw_document_files: boolean;
+  profile: Record<string, unknown>;
+  sources: Record<string, unknown>[];
+  evidence: Record<string, unknown>[];
+  job_descriptions: Record<string, unknown>[];
+  analyses: Record<string, unknown>[];
+  generated_outputs: Record<string, unknown>[];
+  privacy_events: PrivacyEvent[];
   retention_policy: string;
 };
 

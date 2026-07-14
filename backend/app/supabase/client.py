@@ -577,6 +577,125 @@ class SupabaseClient:
             )
         return [row["storage_path"] for row in response.json() if row.get("storage_path")]
 
+    def list_profile_sources(self, profile_id: str, user_id: str) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/profile_sources",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,source_type,storage_path,original_filename,content_hash,"
+                        "parsed_text_hash,parser_version,status,retention_policy,"
+                        "delete_after_parsing,created_at,parsed_at,deleted_at"
+                    ),
+                    "profile_id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                    "order": "created_at.desc",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Profile source list failed: {response.text[:300]}",
+                operation="profile_source_list",
+            )
+        return response.json()
+
+    def list_profile_evidence(self, profile_id: str) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/profile_evidence",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,source_id,fact_type,fact_key,excerpt,normalized_value,"
+                        "confidence,location_json,created_at"
+                    ),
+                    "profile_id": f"eq.{profile_id}",
+                    "order": "created_at.desc",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Profile evidence list failed: {response.text[:300]}",
+                operation="profile_evidence_list",
+            )
+        return response.json()
+
+    def list_profile_analyses(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/analyses",
+                headers=self.headers,
+                params={
+                    "select": (
+                        "id,analysis_type,input_hash,profile_version,job_description_id,"
+                        "deterministic_version,ai_prompt_version,model_provider,model_name,"
+                        "result_json,score,status,created_at"
+                    ),
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Profile analyses list failed: {response.text[:300]}",
+                operation="profile_analyses_list",
+            )
+        return response.json()
+
+    def create_privacy_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/privacy_events",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Privacy event insert failed: {response.text[:300]}",
+                operation="privacy_event_insert",
+            )
+        rows = response.json()
+        return rows[0] if rows else payload
+
+    def list_privacy_events(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.get(
+                f"{self.base_url}/rest/v1/privacy_events",
+                headers=self.headers,
+                params={
+                    "select": "id,event_type,metadata,created_at",
+                    "user_id": f"eq.{user_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Privacy event list failed: {response.text[:300]}",
+                operation="privacy_event_list",
+            )
+        return response.json()
+
     def delete_storage_objects(self, paths: list[str]) -> None:
         if not paths:
             return

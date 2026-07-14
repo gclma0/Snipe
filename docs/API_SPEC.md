@@ -305,15 +305,28 @@ Deletes one generated output.
 
 ### GET `/profiles/{profile_id}/privacy/data-summary`
 
-Shows what user data is stored.
+Shows what user data is stored, including stored document count, saved generated
+output count, privacy event count, and retention policy.
+
+### GET `/profiles/{profile_id}/privacy/export`
+
+Exports structured profile data, source metadata, evidence records, target job
+descriptions, analyses, generated outputs, and privacy events as JSON. Raw
+uploaded file bytes are not included.
+
+### GET `/profiles/{profile_id}/privacy/events`
+
+Lists audit-friendly privacy events for the profile.
 
 ### DELETE `/profiles/{profile_id}/privacy/documents`
 
-Deletes raw uploaded documents while retaining allowed parsed profile facts, if selected by the user.
+Deletes raw uploaded documents while retaining parsed profile facts, if selected
+by the user. Records a privacy event.
 
 ### DELETE `/profiles/{profile_id}/privacy`
 
-Deletes the user's application data according to the product policy.
+Deletes the user's application data according to the product policy. Records a
+best-effort privacy event before deletion.
 
 ## Admin Or Internal Endpoints
 

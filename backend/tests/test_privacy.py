@@ -22,6 +22,43 @@ class FakeSupabaseClient:
     deleted_storage: list[str] = field(default_factory=list)
     deleted_profiles: list[dict[str, Any]] = field(default_factory=list)
     outputs: list[dict[str, Any]] = field(default_factory=lambda: [{"id": "output-1"}])
+    events: list[dict[str, Any]] = field(default_factory=list)
+    profile: dict[str, Any] = field(
+        default_factory=lambda: {
+            "id": TEST_PROFILE_ID,
+            "user_id": TEST_USER_ID,
+            "career_goal": "Prepare for a target role",
+            "preferred_role": "Operations Analyst",
+            "normalized_json": {"skills": [{"name": "excel"}]},
+        }
+    )
+    sources: list[dict[str, Any]] = field(
+        default_factory=lambda: [
+            {
+                "id": "source-1",
+                "source_type": "resume",
+                "storage_path": "user/profile/resume.pdf",
+                "original_filename": "resume.pdf",
+                "content_hash": "content-hash",
+            }
+        ]
+    )
+    evidence: list[dict[str, Any]] = field(
+        default_factory=lambda: [{"id": "evidence-1", "fact_type": "skill", "fact_key": "excel"}]
+    )
+    job_descriptions: list[dict[str, Any]] = field(
+        default_factory=lambda: [
+            {
+                "id": "job-1",
+                "source_type": "pasted_text",
+                "raw_text": "Sensitive pasted job text",
+                "structured_json": {"title": "Operations Analyst"},
+            }
+        ]
+    )
+    analyses: list[dict[str, Any]] = field(
+        default_factory=lambda: [{"id": "analysis-1", "analysis_type": "resume_quality"}]
+    )
 
     def profile_belongs_to_user(self, profile_id: str, user_id: str) -> bool:
         return self.owns_profile and profile_id == TEST_PROFILE_ID and user_id == TEST_USER_ID
@@ -52,6 +89,70 @@ class FakeSupabaseClient:
         assert profile_id == TEST_PROFILE_ID
         assert user_id == TEST_USER_ID
         return self.outputs[:limit]
+
+    def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
+        if not self.profile_belongs_to_user(profile_id, user_id):
+            return None
+        return self.profile
+
+    def list_profile_sources(self, profile_id: str, user_id: str) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        assert user_id == TEST_USER_ID
+        return self.sources
+
+    def list_profile_evidence(self, profile_id: str) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        return self.evidence
+
+    def list_job_descriptions(
+        self,
+        *,
+        profile_id: str,
+        user_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        assert user_id == TEST_USER_ID
+        return self.job_descriptions[:limit]
+
+    def list_profile_analyses(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        assert user_id == TEST_USER_ID
+        return self.analyses[:limit]
+
+    def create_privacy_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        event = {
+            "id": f"event-{len(self.events) + 1}",
+            "created_at": "2026-07-14T00:00:00Z",
+            **payload,
+        }
+        self.events.insert(0, event)
+        return event
+
+    def list_privacy_events(
+        self,
+        *,
+        user_id: str,
+        profile_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        assert profile_id == TEST_PROFILE_ID
+        assert user_id == TEST_USER_ID
+        return [
+            {
+                "id": event.get("id"),
+                "event_type": event.get("event_type"),
+                "metadata": event.get("metadata", {}),
+                "created_at": event.get("created_at"),
+            }
+            for event in self.events[:limit]
+        ]
 
 
 def client_with_fake_supabase(fake: FakeSupabaseClient) -> TestClient:
@@ -91,7 +192,49 @@ def test_data_summary_reports_documents_outputs_and_retention() -> None:
     assert body["profile_exists"] is True
     assert body["stored_document_count"] == 1
     assert body["generated_output_count"] == 1
+    assert body["privacy_event_count"] == 0
     assert "private" in body["retention_policy"].lower()
+    assert fake.events[0]["event_type"] == "privacy_summary_viewed"
+
+
+def test_export_profile_data_returns_structured_data_without_raw_job_text() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+
+    response = client.get(f"/api/v1/profiles/{TEST_PROFILE_ID}/privacy/export")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["export_version"] == "profile-data-export-v1"
+    assert body["includes_raw_document_files"] is False
+    assert body["profile"]["id"] == TEST_PROFILE_ID
+    assert body["sources"][0]["source_type"] == "resume"
+    assert body["evidence"][0]["fact_key"] == "excel"
+    assert body["job_descriptions"][0]["structured_json"]["title"] == "Operations Analyst"
+    assert "raw_text" not in body["job_descriptions"][0]
+    assert body["analyses"][0]["analysis_type"] == "resume_quality"
+    assert fake.events[0]["event_type"] == "profile_data_exported"
+
+
+def test_list_privacy_events_returns_audit_trail() -> None:
+    fake = FakeSupabaseClient(
+        events=[
+            {
+                "id": "event-1",
+                "event_type": "profile_documents_deleted",
+                "metadata": {"deleted_storage_objects": 1},
+                "created_at": "2026-07-14T00:00:00Z",
+            }
+        ]
+    )
+    client = client_with_fake_supabase(fake)
+
+    response = client.get(f"/api/v1/profiles/{TEST_PROFILE_ID}/privacy/events")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["event_type"] == "profile_documents_deleted"
+    assert body[0]["metadata"]["deleted_storage_objects"] == 1
 
 
 def test_delete_documents_keeps_profile() -> None:
@@ -105,6 +248,7 @@ def test_delete_documents_keeps_profile() -> None:
     assert response.json()["deleted_storage_objects"] == 1
     assert fake.deleted_storage == ["user/profile/resume.pdf"]
     assert fake.deleted_profiles == []
+    assert fake.events[0]["event_type"] == "profile_documents_deleted"
 
 
 def test_delete_profile_data_rejects_unowned_profile() -> None:
@@ -127,6 +271,7 @@ def test_delete_profile_data_handles_missing_storage_paths() -> None:
     assert response.status_code == 200
     assert response.json()["deleted_storage_objects"] == 0
     assert fake.deleted_profiles == [{"profile_id": TEST_PROFILE_ID, "user_id": TEST_USER_ID}]
+    assert fake.events[0]["event_type"] == "profile_data_deletion_requested"
 
 
 def test_delete_profile_data_reports_failing_stage() -> None:

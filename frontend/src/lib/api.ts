@@ -45,6 +45,8 @@ export type {
   GeneratedOutput,
   ProfileDeletionResult,
   PrivacyDataSummaryResult,
+  PrivacyEvent,
+  ProfileDataExportResult,
   DocumentDeletionResult,
   GitHubSourceResult,
   PortfolioSourceResult,
@@ -85,6 +87,8 @@ import type {
   GeneratedOutput,
   ProfileDeletionResult,
   PrivacyDataSummaryResult,
+  PrivacyEvent,
+  ProfileDataExportResult,
   DocumentDeletionResult,
   GitHubSourceResult,
   PortfolioSourceResult,
@@ -552,6 +556,14 @@ export function deleteProfileData(token: string, profileId: string) {
 
 export function getPrivacyDataSummary(token: string, profileId: string) {
   return request<PrivacyDataSummaryResult>(`/profiles/${profileId}/privacy/data-summary`, token);
+}
+
+export function exportProfileData(token: string, profileId: string) {
+  return request<ProfileDataExportResult>(`/profiles/${profileId}/privacy/export`, token);
+}
+
+export function listPrivacyEvents(token: string, profileId: string) {
+  return request<PrivacyEvent[]>(`/profiles/${profileId}/privacy/events`, token);
 }
 
 export function deleteProfileDocuments(token: string, profileId: string) {

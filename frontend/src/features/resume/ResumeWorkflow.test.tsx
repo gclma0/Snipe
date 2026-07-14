@@ -1221,6 +1221,7 @@ describe("ResumeWorkflow", () => {
         profile_exists: true,
         stored_document_count: 1,
         generated_output_count: 3,
+        privacy_event_count: 2,
         retention_policy: "Raw uploaded documents are private.",
       },
       {
@@ -1244,12 +1245,100 @@ describe("ResumeWorkflow", () => {
 
     expect(await screen.findByText("Raw uploaded documents are private.")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /Full report/i }));
 
     expect(await screen.findByText("Snipe Full Career Report: Operations Analyst")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download full report/i })).toBeInTheDocument();
     expect(screen.getByText(/Saved AI Outputs/i)).toBeInTheDocument();
+  });
+
+  it("exports profile data and renders privacy events", async () => {
+    const user = userEvent.setup();
+    const createObjectUrl = vi.fn(() => "blob:profile-export");
+    const revokeObjectUrl = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrl,
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        profile_id: "profile-id",
+        export_version: "profile-data-export-v1",
+        includes_raw_document_files: false,
+        profile: { id: "profile-id", preferred_role: "Operations Analyst" },
+        sources: [{ source_type: "resume" }],
+        evidence: [{ fact_type: "skill", fact_key: "excel" }],
+        job_descriptions: [{ structured_json: { title: "Operations Analyst" } }],
+        analyses: [{ analysis_type: "resume_quality" }],
+        generated_outputs: [],
+        privacy_events: [
+          {
+            id: "event-1",
+            event_type: "profile_data_exported",
+            metadata: { generated_output_count: 0 },
+            created_at: "2026-07-14T00:00:00Z",
+          },
+        ],
+        retention_policy: "Export excludes raw uploaded file bytes.",
+      },
+      [
+        {
+          id: "event-2",
+          event_type: "profile_documents_deleted",
+          metadata: { deleted_storage_objects: 1 },
+          created_at: "2026-07-14T00:05:00Z",
+        },
+      ],
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const fileInput = await screen.findByLabelText(/Upload resume/i);
+    const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
+    await user.upload(fileInput, file);
+    await user.click(await screen.findByRole("button", { name: /Export data/i }));
+
+    expect(await screen.findByText("Profile data export generated.")).toBeInTheDocument();
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:profile-export");
+    expect(screen.getByText("profile data exported")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Privacy events/i }));
+
+    expect(await screen.findByText("Privacy events loaded.")).toBeInTheDocument();
+    expect(screen.getByText("profile documents deleted")).toBeInTheDocument();
+    expect(screen.getByText(/deleted_storage_objects/i)).toBeInTheDocument();
   });
 });
 

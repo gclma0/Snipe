@@ -65,11 +65,19 @@ Responsibilities:
 - Create evidence records.
 - Run deterministic resume validation.
 
+Multipart form field:
+
+- `delete_after_parsing`: optional boolean. When true, the raw uploaded file is
+  deleted after parsing while normalized profile facts and evidence records are
+  retained.
+
 ### POST `/profiles/{profile_id}/sources/linkedin`
 
 Phase 2 endpoint for LinkedIn PDF, export, or pasted content.
 
 Direct LinkedIn scraping is not supported.
+
+LinkedIn PDF/DOCX uploads also accept `delete_after_parsing`.
 
 ### POST `/profiles/{profile_id}/sources/github`
 

@@ -21,6 +21,8 @@ TEST_SECRET = "test-secret-with-at-least-thirty-two-bytes"
 class FakeSupabaseClient:
     owns_profile: bool = True
     uploaded: list[dict[str, Any]] = field(default_factory=list)
+    deleted_storage: list[str] = field(default_factory=list)
+    source_delete_markers: list[dict[str, Any]] = field(default_factory=list)
     sources: list[dict[str, Any]] = field(default_factory=list)
     profiles: list[dict[str, Any]] = field(default_factory=list)
     evidence: list[dict[str, Any]] = field(default_factory=list)
@@ -36,6 +38,26 @@ class FakeSupabaseClient:
                 "content_type": content_type,
             }
         )
+
+    def delete_storage_objects(self, paths: list[str]) -> None:
+        self.deleted_storage.extend(paths)
+
+    def mark_profile_source_document_deleted(
+        self,
+        *,
+        source_id: str,
+        profile_id: str,
+        user_id: str,
+        deleted_at: str,
+    ) -> dict[str, Any]:
+        marker = {
+            "source_id": source_id,
+            "profile_id": profile_id,
+            "user_id": user_id,
+            "deleted_at": deleted_at,
+        }
+        self.source_delete_markers.append(marker)
+        return marker
 
     def create_profile_source(self, payload: dict[str, Any]) -> dict[str, Any]:
         row = {"id": "source-id", **payload}
@@ -185,3 +207,30 @@ def test_resume_upload_parses_uploads_and_records_docx_source() -> None:
     body = response.json()
     assert body["source_type"] == "resume_docx"
     assert body["paragraph_count"] == 1
+
+
+def test_resume_upload_can_delete_raw_document_after_parsing() -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake)
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/sources/resume",
+        files={
+            "file": (
+                "resume.pdf",
+                make_pdf("Summary\nOperations Analyst\nSkills\nExcel, SQL"),
+                "application/pdf",
+            )
+        },
+        data={"delete_after_parsing": "true"},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["delete_after_parsing"] is True
+    assert body["raw_document_retained"] is False
+    assert fake.deleted_storage == [body["storage_path"]]
+    assert fake.sources[0]["delete_after_parsing"] is True
+    assert fake.sources[0]["retention_policy"] == "delete_after_parsing"
+    assert fake.source_delete_markers[0]["source_id"] == "source-id"

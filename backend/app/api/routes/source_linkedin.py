@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.analysis.linkedin import analyze_linkedin_profile, linkedin_evidence
@@ -36,6 +36,8 @@ class LinkedInSourceResponse(BaseModel):
     experience_count: int = Field(ge=0)
     evidence_count: int = Field(ge=0)
     profile_version: int | None = Field(default=None, ge=1)
+    delete_after_parsing: bool = False
+    raw_document_retained: bool = True
 
 
 @router.post(
@@ -80,6 +82,7 @@ def add_linkedin_text_source(
 async def upload_linkedin_source(
     profile_id: str,
     file: Annotated[UploadFile, File(...)],
+    delete_after_parsing: Annotated[bool, Form()] = False,
     user: AuthenticatedUser = CurrentUser,
     supabase: SupabaseClient = Supabase,
 ) -> LinkedInSourceResponse:
@@ -126,6 +129,7 @@ async def upload_linkedin_source(
             original_filename=filename,
             storage_path=storage_path,
             content_hash=sha256(content).hexdigest(),
+            delete_after_parsing=delete_after_parsing,
         )
     except LinkedInParseError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -146,6 +150,7 @@ def _save_linkedin_source(
     original_filename: str,
     storage_path: str | None = None,
     content_hash: str | None = None,
+    delete_after_parsing: bool = False,
 ) -> LinkedInSourceResponse:
     text_hash = sha256(parsed.text.encode("utf-8")).hexdigest()
     source = supabase.create_profile_source(
@@ -159,10 +164,25 @@ def _save_linkedin_source(
             "parsed_text_hash": text_hash,
             "parser_version": parsed.parser,
             "status": "analyzed",
+            "delete_after_parsing": delete_after_parsing,
+            "retention_policy": (
+                "delete_after_parsing" if delete_after_parsing else "retain_private"
+            ),
             "parsed_at": datetime.now(tz=UTC).isoformat(),
         }
     )
     source_id = source.get("id")
+    raw_document_retained = bool(storage_path)
+    if delete_after_parsing and storage_path:
+        supabase.delete_storage_objects([storage_path])
+        if source_id:
+            supabase.mark_profile_source_document_deleted(
+                source_id=source_id,
+                profile_id=profile_id,
+                user_id=user_id,
+                deleted_at=datetime.now(tz=UTC).isoformat(),
+            )
+        raw_document_retained = False
     analysis = analyze_linkedin_profile(parsed)
     evidence = linkedin_evidence(profile_id=profile_id, source_id=source_id, analysis=analysis)
     created_evidence = create_evidence(supabase, evidence)
@@ -184,4 +204,6 @@ def _save_linkedin_source(
         experience_count=len(analysis.experience_items),
         evidence_count=len(created_evidence),
         profile_version=updated_profile.get("version"),
+        delete_after_parsing=delete_after_parsing,
+        raw_document_retained=raw_document_retained,
     )

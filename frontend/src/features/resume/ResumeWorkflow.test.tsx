@@ -205,6 +205,114 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByRole("button", { name: /Regenerate LinkedIn/i })).toBeInTheDocument();
   });
 
+  it("uploads a resume with delete-after-parsing enabled", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+        delete_after_parsing: true,
+        raw_document_retained: false,
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    await user.click(await screen.findByLabelText(/Delete resume file after parsing/i));
+    const fileInput = screen.getByLabelText(/Upload resume/i);
+    await user.upload(fileInput, new File(["resume content"], "resume.pdf", { type: "application/pdf" }));
+
+    expect(await screen.findByText("Resume parsed and raw file deleted.")).toBeInTheDocument();
+    const uploadCall = (fetchMock.mock.calls as unknown as FetchCall[]).find(([url]) =>
+      String(url).includes("/profiles/profile-id/sources/resume"),
+    );
+    expect(uploadCall).toBeTruthy();
+    expect((uploadCall?.[1]?.body as FormData).get("delete_after_parsing")).toBe("true");
+  });
+
+  it("uploads a LinkedIn document with delete-after-parsing enabled", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([
+      {
+        id: "profile-id",
+        career_goal: "Prepare for a target role",
+        preferred_role: "Operations Analyst",
+        profile_status: "draft",
+      },
+      {
+        source_id: "source-id",
+        profile_id: "profile-id",
+        source_type: "resume",
+        original_filename: "resume.pdf",
+        storage_path: "candidate-documents/resume.pdf",
+        content_hash: "content-hash",
+        parsed_text_hash: "parsed-hash",
+        parser_version: "test-parser",
+        status: "parsed",
+        text_length: 1200,
+        page_count: 1,
+        paragraph_count: 8,
+        profile_version: 1,
+        evidence_count: 4,
+        normalized_profile_updated: true,
+      },
+      {
+        source_id: "linkedin-source-id",
+        profile_id: "profile-id",
+        source_type: "linkedin_docx",
+        status: "analyzed",
+        headline: "Operations Analyst",
+        skill_signals: ["excel", "sql"],
+        experience_count: 1,
+        evidence_count: 2,
+        profile_version: 2,
+        delete_after_parsing: true,
+        raw_document_retained: false,
+      },
+    ]);
+    render(<ResumeWorkflow accessToken="token" />);
+
+    await user.type(screen.getByLabelText(/Preferred role/i), "Operations Analyst");
+    await user.click(screen.getByRole("button", { name: /Create profile/i }));
+    const resumeInput = await screen.findByLabelText(/Upload resume/i);
+    await user.upload(resumeInput, new File(["resume content"], "resume.pdf", { type: "application/pdf" }));
+    await user.click(await screen.findByLabelText(/Delete LinkedIn file after parsing/i));
+    const linkedinInput = screen.getByLabelText(/Upload PDF\/DOCX/i);
+    await user.upload(
+      linkedinInput,
+      new File(["linkedin content"], "linkedin.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+
+    expect(await screen.findByText("LinkedIn upload analyzed and raw file deleted.")).toBeInTheDocument();
+    const uploadCall = (fetchMock.mock.calls as unknown as FetchCall[]).find(([url]) =>
+      String(url).includes("/profiles/profile-id/sources/linkedin/upload"),
+    );
+    expect(uploadCall).toBeTruthy();
+    expect((uploadCall?.[1]?.body as FormData).get("delete_after_parsing")).toBe("true");
+  });
+
   it("renders saved-output filters and management controls after history loads", async () => {
     const user = userEvent.setup();
     mockFetch([
@@ -1353,3 +1461,5 @@ function mockFetch(responses: unknown[]) {
   globalThis.fetch = fetchMock;
   return fetchMock;
 }
+
+type FetchCall = [input: RequestInfo | URL, init?: RequestInit];

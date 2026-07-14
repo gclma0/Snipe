@@ -131,9 +131,15 @@ export function createProfile(token: string, payload: { career_goal: string; pre
   });
 }
 
-export function uploadResume(token: string, profileId: string, file: File) {
+export function uploadResume(
+  token: string,
+  profileId: string,
+  file: File,
+  deleteAfterParsing = false,
+) {
   const body = new FormData();
   body.append("file", file);
+  body.append("delete_after_parsing", String(deleteAfterParsing));
   return request<ResumeUploadResult>(`/profiles/${profileId}/sources/resume`, token, {
     method: "POST",
     body,
@@ -602,9 +608,15 @@ export function addLinkedInTextSource(token: string, profileId: string, text: st
   });
 }
 
-export function uploadLinkedInSource(token: string, profileId: string, file: File) {
+export function uploadLinkedInSource(
+  token: string,
+  profileId: string,
+  file: File,
+  deleteAfterParsing = false,
+) {
   const body = new FormData();
   body.append("file", file);
+  body.append("delete_after_parsing", String(deleteAfterParsing));
   return request<LinkedInSourceResult>(`/profiles/${profileId}/sources/linkedin/upload`, token, {
     method: "POST",
     body,

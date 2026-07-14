@@ -161,6 +161,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [isSavedOutputsLoading, setIsSavedOutputsLoading] = useState(false);
   const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
   const [isJobMatchHistoryLoading, setIsJobMatchHistoryLoading] = useState(false);
+  const [deleteResumeAfterParsing, setDeleteResumeAfterParsing] = useState(false);
+  const [deleteLinkedInAfterParsing, setDeleteLinkedInAfterParsing] = useState(false);
   const [jobMatchQuery, setJobMatchQuery] = useState("");
   const [jobMatchLimit, setJobMatchLimit] = useState(10);
   const [ragTitle, setRagTitle] = useState("");
@@ -630,9 +632,18 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setIsBusy(true);
     setMessage(null);
     try {
-      const result = await uploadLinkedInSource(accessToken, profile.id, file);
+      const result = await uploadLinkedInSource(
+        accessToken,
+        profile.id,
+        file,
+        deleteLinkedInAfterParsing,
+      );
       setLinkedInResult(result);
-      setMessage("LinkedIn upload analyzed.");
+      setMessage(
+        result.raw_document_retained === false
+          ? "LinkedIn upload analyzed and raw file deleted."
+          : "LinkedIn upload analyzed.",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload LinkedIn file.");
     } finally {
@@ -650,7 +661,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setIsBusy(true);
     setMessage(null);
     try {
-      const result = await uploadResume(accessToken, profile.id, file);
+      const result = await uploadResume(accessToken, profile.id, file, deleteResumeAfterParsing);
       setUploadResult(result);
       setQualityResult(null);
       setAtsResult(null);
@@ -682,7 +693,11 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setGeneratedOutputs([]);
       setGeneratedOutputFilter("all");
       setSelectedGeneratedOutput(null);
-      setMessage("Resume uploaded and parsed.");
+      setMessage(
+        result.raw_document_retained === false
+          ? "Resume parsed and raw file deleted."
+          : "Resume uploaded and parsed.",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload resume.");
     } finally {
@@ -1628,6 +1643,8 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             isBusy={isBusy}
             linkedInForm={linkedInForm}
             linkedInResult={linkedInResult}
+            deleteLinkedInAfterParsing={deleteLinkedInAfterParsing}
+            deleteResumeAfterParsing={deleteResumeAfterParsing}
             portfolioForm={portfolioForm}
             portfolioResult={portfolioResult}
             privacySummary={privacySummary}
@@ -1639,7 +1656,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
             onAddPortfolio={handleAddPortfolio}
             onCreateProfile={handleCreateProfile}
             onDeleteDocumentsOnly={handleDeleteDocumentsOnly}
+            onDeleteLinkedInAfterParsingChange={setDeleteLinkedInAfterParsing}
             onDeleteProfile={handleDeleteProfile}
+            onDeleteResumeAfterParsingChange={setDeleteResumeAfterParsing}
             onExportProfileData={handleExportProfileData}
             onLoadLatestProfile={handleLoadLatestProfile}
             onLoadPrivacyEvents={handleLoadPrivacyEvents}

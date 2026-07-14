@@ -83,6 +83,41 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def mark_profile_source_document_deleted(
+        self,
+        *,
+        source_id: str,
+        profile_id: str,
+        user_id: str,
+        deleted_at: str,
+    ) -> dict[str, Any]:
+        with httpx.Client(timeout=15, trust_env=False) as client:
+            response = client.patch(
+                f"{self.base_url}/rest/v1/profile_sources",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                params={
+                    "id": f"eq.{source_id}",
+                    "profile_id": f"eq.{profile_id}",
+                    "user_id": f"eq.{user_id}",
+                },
+                json={
+                    "storage_path": None,
+                    "deleted_at": deleted_at,
+                    "retention_policy": "delete_after_parsing",
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Source document delete marker failed: {response.text[:300]}",
+                operation="source_document_delete_marker",
+            )
+        rows = response.json()
+        return rows[0] if rows else {}
+
     def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
         with httpx.Client(timeout=15, trust_env=False) as client:
             response = client.get(

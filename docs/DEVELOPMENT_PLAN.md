@@ -15,11 +15,11 @@ Current build status: Milestone 20 is implemented at usable depth, with Mileston
 - Milestone 19 is implemented with RAG ingestion, retrieval, source filters, and reference-library management.
 - Milestone 20 is implemented for deterministic RAG-backed job matching and saved job-match history.
 - Milestones 21-23 have been started ahead of strict sequence through interview prep, claim questions, mock interview, answer evaluation, outreach, career-transition outputs, LinkedIn optimization, and learning-plan generation.
-- Milestone 24 is partially implemented through full reports, data export, privacy event history, and baseline privacy controls.
+- Milestone 24 is implemented at usable depth through full reports, data export, privacy event history, delete-after-parsing controls, and baseline privacy controls.
 
 Known later-phase gaps:
 
-- Optional delete-after-parsing controls.
+- None currently identified from the approved documentation scope.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

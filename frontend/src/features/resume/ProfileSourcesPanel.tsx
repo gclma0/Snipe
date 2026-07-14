@@ -29,10 +29,13 @@ type ProfileSourcesPanelProps = {
   linkedInResult: LinkedInSourceResult | null;
   privacySummary: PrivacyDataSummaryResult | null;
   privacyEvents: PrivacyEvent[];
+  deleteResumeAfterParsing: boolean;
+  deleteLinkedInAfterParsing: boolean;
   isBusy: boolean;
   onCreateProfile: (values: ProfileValues) => void;
   onLoadLatestProfile: () => void;
   onUploadResume: (event: ChangeEvent<HTMLInputElement>) => void;
+  onDeleteResumeAfterParsingChange: (value: boolean) => void;
   onDeleteProfile: () => void;
   onLoadPrivacySummary: () => void;
   onExportProfileData: () => void;
@@ -42,6 +45,7 @@ type ProfileSourcesPanelProps = {
   onAddPortfolio: (values: PortfolioValues) => void;
   onAddLinkedInText: (values: LinkedInValues) => void;
   onUploadLinkedIn: (event: ChangeEvent<HTMLInputElement>) => void;
+  onDeleteLinkedInAfterParsingChange: (value: boolean) => void;
 };
 
 export function ProfileSourcesPanel({
@@ -55,10 +59,13 @@ export function ProfileSourcesPanel({
   linkedInResult,
   privacySummary,
   privacyEvents,
+  deleteResumeAfterParsing,
+  deleteLinkedInAfterParsing,
   isBusy,
   onCreateProfile,
   onLoadLatestProfile,
   onUploadResume,
+  onDeleteResumeAfterParsingChange,
   onDeleteProfile,
   onLoadPrivacySummary,
   onExportProfileData,
@@ -68,6 +75,7 @@ export function ProfileSourcesPanel({
   onAddPortfolio,
   onAddLinkedInText,
   onUploadLinkedIn,
+  onDeleteLinkedInAfterParsingChange,
 }: ProfileSourcesPanelProps) {
   return (
     <>
@@ -98,6 +106,16 @@ export function ProfileSourcesPanel({
             <FileUp aria-hidden="true" className="h-4 w-4" />
             Upload resume
             <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onUploadResume} />
+          </label>
+          <label className="ml-3 mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              checked={deleteResumeAfterParsing}
+              className="h-4 w-4"
+              disabled={isBusy}
+              type="checkbox"
+              onChange={(event) => onDeleteResumeAfterParsingChange(event.target.checked)}
+            />
+            Delete resume file after parsing
           </label>
           <button className="ml-3 mt-4 inline-flex items-center justify-center gap-2 border border-red-200 px-4 py-2 text-sm font-medium text-red-700" disabled={isBusy} type="button" onClick={onDeleteProfile}>
             <Trash2 aria-hidden="true" className="h-4 w-4" />
@@ -212,6 +230,16 @@ export function ProfileSourcesPanel({
               <FileUp aria-hidden="true" className="h-4 w-4" />
               Upload PDF/DOCX
               <input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onUploadLinkedIn} />
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                checked={deleteLinkedInAfterParsing}
+                className="h-4 w-4"
+                disabled={isBusy}
+                type="checkbox"
+                onChange={(event) => onDeleteLinkedInAfterParsingChange(event.target.checked)}
+              />
+              Delete LinkedIn file after parsing
             </label>
           </div>
         </form>

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.api.routes.source_common import MAX_RESUME_BYTES, CurrentUser, Supabase
@@ -31,12 +31,15 @@ class ResumeUploadResponse(BaseModel):
     profile_version: int | None = Field(default=None, ge=1)
     evidence_count: int = Field(default=0, ge=0)
     normalized_profile_updated: bool = False
+    delete_after_parsing: bool = False
+    raw_document_retained: bool = True
 
 
 @router.post("/resume", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume_source(
     profile_id: str,
     file: Annotated[UploadFile, File(...)],
+    delete_after_parsing: Annotated[bool, Form()] = False,
     user: AuthenticatedUser = CurrentUser,
     supabase: SupabaseClient = Supabase,
 ) -> ResumeUploadResponse:
@@ -81,10 +84,25 @@ async def upload_resume_source(
                 "parsed_text_hash": parsed_text_hash,
                 "parser_version": parsed.parser,
                 "status": "parsed",
+                "delete_after_parsing": delete_after_parsing,
+                "retention_policy": (
+                    "delete_after_parsing" if delete_after_parsing else "retain_private"
+                ),
                 "parsed_at": datetime.now(tz=UTC).isoformat(),
             }
         )
         source_id = source.get("id")
+        raw_document_retained = True
+        if delete_after_parsing:
+            supabase.delete_storage_objects([storage_path])
+            if source_id:
+                supabase.mark_profile_source_document_deleted(
+                    source_id=source_id,
+                    profile_id=profile_id,
+                    user_id=user.id,
+                    deleted_at=datetime.now(tz=UTC).isoformat(),
+                )
+            raw_document_retained = False
         built_profile = build_normalized_profile(
             parsed=parsed,
             profile_id=profile_id,
@@ -141,4 +159,6 @@ async def upload_resume_source(
         profile_version=updated_profile.get("version"),
         evidence_count=len(created_evidence),
         normalized_profile_updated=True,
+        delete_after_parsing=delete_after_parsing,
+        raw_document_retained=raw_document_retained,
     )

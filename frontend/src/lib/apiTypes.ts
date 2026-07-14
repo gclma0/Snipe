@@ -21,6 +21,8 @@ export type ResumeUploadResult = {
   profile_version: number | null;
   evidence_count: number;
   normalized_profile_updated: boolean;
+  delete_after_parsing?: boolean;
+  raw_document_retained?: boolean;
 };
 
 export type ResumeQualityFinding = {
@@ -560,6 +562,8 @@ export type LinkedInSourceResult = {
   experience_count: number;
   evidence_count: number;
   profile_version: number | null;
+  delete_after_parsing?: boolean;
+  raw_document_retained?: boolean;
 };
 
 export type RagSourceType = "job_description" | "role_framework" | "career_guidance" | "job_listing";

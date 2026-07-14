@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
+from io import BytesIO
 from typing import Any
 
+from docx import Document
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
@@ -52,6 +54,8 @@ class FakeSupabaseClient:
     evidence: list[dict[str, Any]] = field(default_factory=list)
     updates: list[dict[str, Any]] = field(default_factory=list)
     uploads: list[dict[str, Any]] = field(default_factory=list)
+    deleted_storage: list[str] = field(default_factory=list)
+    source_delete_markers: list[dict[str, Any]] = field(default_factory=list)
 
     def get_candidate_profile(self, profile_id: str, user_id: str) -> dict[str, Any] | None:
         if profile_id != TEST_PROFILE_ID or user_id != TEST_USER_ID:
@@ -81,6 +85,26 @@ class FakeSupabaseClient:
     def upload_document(self, *, path: str, content: bytes, content_type: str) -> None:
         self.uploads.append({"path": path, "content": content, "content_type": content_type})
 
+    def delete_storage_objects(self, paths: list[str]) -> None:
+        self.deleted_storage.extend(paths)
+
+    def mark_profile_source_document_deleted(
+        self,
+        *,
+        source_id: str,
+        profile_id: str,
+        user_id: str,
+        deleted_at: str,
+    ) -> dict[str, Any]:
+        marker = {
+            "source_id": source_id,
+            "profile_id": profile_id,
+            "user_id": user_id,
+            "deleted_at": deleted_at,
+        }
+        self.source_delete_markers.append(marker)
+        return marker
+
 
 def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClient:
     import app.api.routes.source_portfolio as source_portfolio
@@ -95,6 +119,15 @@ def client_with_fake_supabase(fake: FakeSupabaseClient, monkeypatch) -> TestClie
     )
     app.dependency_overrides[get_supabase_client] = lambda: fake
     return TestClient(app)
+
+
+def make_docx(text: str) -> bytes:
+    buffer = BytesIO()
+    document = Document()
+    for line in text.splitlines():
+        document.add_paragraph(line)
+    document.save(buffer)
+    return buffer.getvalue()
 
 
 def test_add_portfolio_source_records_technical_signals(monkeypatch) -> None:
@@ -174,3 +207,41 @@ def test_linkedin_url_only_is_rejected_without_scraping(monkeypatch) -> None:
     assert response.status_code == 400
     assert "Direct LinkedIn scraping is not supported" in response.json()["detail"]
     assert fake.sources == []
+
+
+def test_upload_linkedin_source_can_delete_raw_document_after_parsing(monkeypatch) -> None:
+    fake = FakeSupabaseClient()
+    client = client_with_fake_supabase(fake, monkeypatch)
+    linkedin_text = """
+    Senior Marketing Operations Manager
+    About
+    I lead marketing operations, analytics, and campaign management.
+    Experience
+    Built HubSpot campaign reporting for regional sales teams.
+    Skills
+    Marketing
+    Analytics
+    HubSpot
+    """
+
+    response = client.post(
+        f"/api/v1/profiles/{TEST_PROFILE_ID}/sources/linkedin/upload",
+        files={
+            "file": (
+                "linkedin.docx",
+                make_docx(linkedin_text),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        data={"delete_after_parsing": "true"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_type"] == "linkedin_docx"
+    assert body["delete_after_parsing"] is True
+    assert body["raw_document_retained"] is False
+    assert fake.deleted_storage == [fake.uploads[0]["path"]]
+    assert fake.sources[0]["delete_after_parsing"] is True
+    assert fake.sources[0]["retention_policy"] == "delete_after_parsing"
+    assert fake.source_delete_markers[0]["source_id"] == "source-1"

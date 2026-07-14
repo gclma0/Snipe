@@ -74,3 +74,13 @@ Copy-Item E:\AI\frontend\.env.example E:\AI\frontend\.env
 ```
 
 Supabase and AI provider values are placeholders until the relevant milestones begin.
+
+## Production Smoke Check
+
+After deployment, run:
+
+```powershell
+.\scripts\production-smoke.ps1 -FrontendUrl https://your-frontend.vercel.app -BackendUrl https://your-backend.onrender.com
+```
+
+See `docs/PRODUCTION_SMOKE_TEST.md` for the full manual checklist.

@@ -99,6 +99,12 @@ export function ProfileSourcesPanel({
       </button>
       {profileForm.formState.errors.career_goal ? <p className="mt-2 text-sm text-red-600">{profileForm.formState.errors.career_goal.message}</p> : null}
       {profileForm.formState.errors.preferred_role ? <p className="mt-2 text-sm text-red-600">{profileForm.formState.errors.preferred_role.message}</p> : null}
+      {!profile ? (
+        <div className="mt-5 border-t border-border pt-5 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Start with a candidate profile.</p>
+          <p className="mt-1">Create a profile with the role you want, then upload a resume to unlock analysis and AI outputs.</p>
+        </div>
+      ) : null}
       {profile ? (
         <div className="mt-5 border-t border-border pt-5">
           <p className="text-sm text-muted-foreground">Profile ready for {profile.preferred_role}.</p>
@@ -166,6 +172,7 @@ export function ProfileSourcesPanel({
       {profile ? (
         <form className="mt-5 border-t border-border pt-5" onSubmit={githubForm.handleSubmit(onAddGitHub)}>
           <h3 className="text-base font-semibold">Optional GitHub source</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Use this only when public repositories provide useful evidence for the target role.</p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input className="w-full border border-border px-3 py-2 text-sm" placeholder="octocat or https://github.com/octocat" {...githubForm.register("username_or_url")} />
             <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
@@ -193,6 +200,7 @@ export function ProfileSourcesPanel({
       {profile ? (
         <form className="mt-5 border-t border-border pt-5" onSubmit={portfolioForm.handleSubmit(onAddPortfolio)}>
           <h3 className="text-base font-semibold">Optional portfolio source</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Add a portfolio, case-study page, or professional site when it supports real candidate evidence.</p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input className="w-full border border-border px-3 py-2 text-sm" placeholder="https://your-portfolio.com" {...portfolioForm.register("url")} />
             <button className="inline-flex items-center justify-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" disabled={isBusy} type="submit">
@@ -219,6 +227,7 @@ export function ProfileSourcesPanel({
       {profile ? (
         <form className="mt-5 border-t border-border pt-5" onSubmit={linkedInForm.handleSubmit(onAddLinkedInText)}>
           <h3 className="text-base font-semibold">Optional LinkedIn source</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Paste exported profile text or upload a file. Direct LinkedIn scraping is not supported.</p>
           <textarea className="mt-3 min-h-32 w-full border border-border px-3 py-2 text-sm" placeholder="Paste LinkedIn profile text or export content. Direct LinkedIn scraping is not supported." {...linkedInForm.register("text")} />
           {linkedInForm.formState.errors.text ? <p className="mt-2 text-sm text-red-600">{linkedInForm.formState.errors.text.message}</p> : null}
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">

@@ -75,6 +75,9 @@ export function RagReferencePanel({
   return (
     <div className="mt-5 border-t border-border pt-5 text-sm">
       <h3 className="text-base font-semibold">Reference library</h3>
+      <p className="mt-2 text-muted-foreground">
+        Add job listings, role frameworks, or career guidance so job matching and recommendations can cite reusable references.
+      </p>
       {editingDocument ? (
         <div className="mt-3 border border-border bg-muted/30 p-3">
           <p className="font-medium">Editing {editingDocument.title}</p>
@@ -212,7 +215,7 @@ export function RagReferencePanel({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-muted-foreground">No saved references loaded yet.</p>
+          <p className="mt-3 text-muted-foreground">No saved references loaded yet. Add a reference above or load existing references.</p>
         )}
       </div>
       <div className="mt-5 border-t border-border pt-5">

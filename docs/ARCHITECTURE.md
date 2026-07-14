@@ -217,6 +217,7 @@ Requirements:
 - Provide delete-my-data workflow.
 - Track what data is retained.
 - Keep provider calls minimal and structured.
+- Expose only non-secret provider configuration health so external LLM setup can be validated without revealing API key values or making paid network calls.
 - Avoid direct LinkedIn scraping.
 - Avoid unsupported claims about commercial ATS systems.
 

@@ -54,6 +54,9 @@ export function TargetJobForm({
         <h3 className="text-base font-semibold">Target job description</h3>
         {selectedJobId ? <p className="text-xs text-muted-foreground">Active target selected</p> : null}
       </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Add a target job to make skill gaps, tailoring, interview prep, and application materials role-specific.
+      </p>
       {jobOptions.length ? (
         <label className="mt-3 block text-sm font-medium">
           Saved target jobs
@@ -86,6 +89,7 @@ export function TargetJobForm({
       </label>
       <div className="mt-5 border-t border-border pt-5">
         <h4 className="text-sm font-semibold">Job match search</h4>
+        <p className="mt-1 text-sm text-muted-foreground">Job matching uses saved job references from the reference library.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_9rem]">
           <label className="block text-sm font-medium">
             Search query
@@ -143,7 +147,9 @@ export function TargetJobForm({
               </div>
             ))}
           </div>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No saved job match runs loaded yet.</p>
+        )}
       </div>
     </form>
   );

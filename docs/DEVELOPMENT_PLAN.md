@@ -23,11 +23,11 @@ Known product-scope gaps from the approved documentation:
 
 Remaining hardening and polish items:
 
-- Run an end-to-end production smoke pass after applying the latest Supabase migrations.
+- Run an end-to-end production smoke pass after applying the latest Supabase migrations; a repeatable smoke script and checklist are available.
 - Continue splitting the large resume workflow UI into smaller maintainable feature surfaces as future changes touch each domain.
 - Add broader browser-level integration tests for the longest user journeys; target-specific saved-output refresh coverage has been added.
-- Validate configured external LLM providers beyond the local-template fallback.
-- Review UX copy and empty states for first-time users.
+- Validate configured external LLM providers beyond the local-template fallback; non-secret provider configuration health is now available in the API and frontend.
+- Review UX copy and empty states for first-time users; profile, resume, saved-output, target-job, job-match, and reference-library empty states have been improved.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

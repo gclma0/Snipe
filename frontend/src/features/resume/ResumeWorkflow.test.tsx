@@ -26,6 +26,9 @@ describe("ResumeWorkflow", () => {
     expect(screen.getByLabelText(/Preferred role/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Create profile/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Load latest profile/i })).toBeInTheDocument();
+    expect(screen.getByText("Start with a candidate profile.")).toBeInTheDocument();
+    expect(screen.getByText("Resume required for analysis.")).toBeInTheDocument();
+    expect(screen.getByText(/Generated reports, rewrites, tailoring packages/i)).toBeInTheDocument();
   });
 
   it("loads the latest profile and saved outputs after refresh", async () => {
@@ -182,7 +185,7 @@ describe("ResumeWorkflow", () => {
     await user.upload(fileInput, file);
 
     expect(await screen.findByText("Analysis")).toBeInTheDocument();
-    expect(screen.getByText("Saved outputs")).toBeInTheDocument();
+    expect(screen.getAllByText("Saved outputs").length).toBeGreaterThan(0);
     expect(screen.getByText("AI generation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resume quality/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Job matches/i })).toBeInTheDocument();

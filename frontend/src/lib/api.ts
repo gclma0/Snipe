@@ -56,6 +56,7 @@ export type {
   RagDocumentSummary,
   RagSearchResult,
   RagSourceType,
+  AIProviderStatus,
 } from "./apiTypes";
 
 import type {
@@ -98,7 +99,19 @@ import type {
   RagDocumentSummary,
   RagSearchResult,
   RagSourceType,
+  AIProviderStatus,
 } from "./apiTypes";
+
+async function publicRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${env.apiBaseUrl}${path}`, init);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(typeof error.detail === "string" ? error.detail : "Request failed.");
+  }
+
+  return response.json() as Promise<T>;
+}
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
@@ -115,6 +128,10 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
   }
 
   return response.json() as Promise<T>;
+}
+
+export function getAIProviderStatus() {
+  return publicRequest<AIProviderStatus>("/health/ai-provider");
 }
 
 export function listProfiles(token: string) {

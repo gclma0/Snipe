@@ -15,6 +15,12 @@
 
 Returns backend status, version, and dependency health where safe.
 
+### GET `/health/ai-provider`
+
+Returns non-secret AI provider configuration status. The response identifies whether the backend is using the local-template fallback or an external OpenAI-compatible provider, whether required settings are present, and any configuration issues. API key values must never be returned.
+
+The frontend exposes this check in the AI provider status panel so configuration can be verified without using Swagger or command-line tools.
+
 ## Profiles
 
 ### POST `/profiles`

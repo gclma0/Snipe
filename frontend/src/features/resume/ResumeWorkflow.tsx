@@ -186,6 +186,75 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     linkedInForm,
   } = useResumeWorkflowForms();
 
+  function resetOptionalSourceResults() {
+    setGithubResult(null);
+    setPortfolioResult(null);
+    setLinkedInResult(null);
+  }
+
+  function resetPrivacyState() {
+    setPrivacySummary(null);
+    setPrivacyEvents([]);
+  }
+
+  function resetAiResults() {
+    setAiInterpretationResult(null);
+    setRewriteResult(null);
+    setTailoringResult(null);
+    setInterviewResult(null);
+    setClaimVerificationResult(null);
+    setMockInterviewSession(null);
+    setMockInterviewEvaluation(null);
+    setMockInterviewAnswer("");
+    setOutreachResult(null);
+    setCareerTransitionResult(null);
+    setProjectRoadmapResult(null);
+    setLearningPlanResult(null);
+    setLinkedInOptimizationResult(null);
+    setApplicationMaterialsResult(null);
+  }
+
+  function resetGeneratedOutputHistory() {
+    setGeneratedOutputs([]);
+    setGeneratedOutputFilter("all");
+    setSelectedGeneratedOutput(null);
+  }
+
+  function resetAnalysisResults() {
+    setQualityResult(null);
+    setAtsResult(null);
+    setCompletenessResult(null);
+    setSkillGapResult(null);
+    setJobMatchResult(null);
+    setDashboardResult(null);
+    setReportResult(null);
+    setFullReportResult(null);
+  }
+
+  function resetProfileDependentResults() {
+    resetAnalysisResults();
+    resetOptionalSourceResults();
+    resetPrivacyState();
+    resetAiResults();
+    resetGeneratedOutputHistory();
+  }
+
+  function resetTargetDependentResults(options: { clearGeneratedOutputs?: boolean; clearJobMatches?: boolean } = {}) {
+    setSkillGapResult(null);
+    if (options.clearJobMatches) {
+      setJobMatchResult(null);
+    }
+    setDashboardResult(null);
+    setReportResult(null);
+    setFullReportResult(null);
+    resetAiResults();
+    if (options.clearGeneratedOutputs) {
+      resetGeneratedOutputHistory();
+      return;
+    }
+    setSelectedGeneratedOutput(null);
+  }
+
   async function handleCreateProfile(values: ProfileValues) {
     if (!accessToken) {
       setMessage("Sign in before creating a profile.");
@@ -198,38 +267,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const created = await createProfile(accessToken, values);
       setProfile(created);
       setUploadResult(null);
-      setQualityResult(null);
-      setAtsResult(null);
-      setCompletenessResult(null);
       setJobResult(null);
       setJobOptions([]);
-      setGithubResult(null);
-      setPortfolioResult(null);
-      setLinkedInResult(null);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setPrivacySummary(null);
-      setPrivacyEvents([]);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setGeneratedOutputs([]);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      resetProfileDependentResults();
       setMessage("Profile created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create profile.");
@@ -257,35 +297,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const jobs = await listJobDescriptions(accessToken, latestProfile.id);
       setProfile(latestProfile);
       setUploadResult(null);
-      setQualityResult(null);
-      setAtsResult(null);
-      setCompletenessResult(null);
       setJobResult(null);
       setJobOptions(jobs);
-      setGithubResult(null);
-      setPortfolioResult(null);
-      setLinkedInResult(null);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setPrivacySummary(null);
-      setPrivacyEvents([]);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
+      resetProfileDependentResults();
       setGeneratedOutputs(outputs);
       setGeneratedOutputFilter("all");
       setSelectedGeneratedOutput(null);
@@ -308,28 +322,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const result = await createJobDescription(accessToken, profile.id, values.text);
       setJobResult(result);
       setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setGeneratedOutputs([]);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      resetTargetDependentResults({ clearGeneratedOutputs: true, clearJobMatches: true });
       setMessage("Job description analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not analyze job description.");
@@ -354,28 +347,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       const result = await uploadJobDescription(accessToken, profile.id, file);
       setJobResult(result);
       setJobOptions((current) => [result, ...current.filter((job) => job.id !== result.id)]);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setGeneratedOutputs([]);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      resetTargetDependentResults({ clearGeneratedOutputs: true, clearJobMatches: true });
       setMessage("Job description upload analyzed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not upload job description.");
@@ -387,25 +359,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   function handleSelectJobDescription(jobId: string) {
     const selected = jobOptions.find((job) => job.id === jobId) ?? null;
     setJobResult(selected);
-    setSkillGapResult(null);
-    setDashboardResult(null);
-    setReportResult(null);
-    setFullReportResult(null);
-    setAiInterpretationResult(null);
-    setRewriteResult(null);
-    setTailoringResult(null);
-    setInterviewResult(null);
-    setClaimVerificationResult(null);
-    setMockInterviewSession(null);
-    setMockInterviewEvaluation(null);
-    setMockInterviewAnswer("");
-    setOutreachResult(null);
-    setCareerTransitionResult(null);
-    setProjectRoadmapResult(null);
-    setLearningPlanResult(null);
-    setLinkedInOptimizationResult(null);
-    setApplicationMaterialsResult(null);
-    setSelectedGeneratedOutput(null);
+    resetTargetDependentResults();
     setMessage(selected ? "Saved target job selected." : "Target job selection cleared.");
   }
 
@@ -424,25 +378,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       : null;
     if (existingTarget) {
       setJobResult(existingTarget);
-      setSkillGapResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setSelectedGeneratedOutput(null);
+      resetTargetDependentResults();
       return existingTarget;
     }
 
@@ -460,25 +396,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         [match.job_reference_id]: result.id ?? "",
       }));
     }
-    setSkillGapResult(null);
-    setDashboardResult(null);
-    setReportResult(null);
-    setFullReportResult(null);
-    setAiInterpretationResult(null);
-    setRewriteResult(null);
-    setTailoringResult(null);
-    setInterviewResult(null);
-    setClaimVerificationResult(null);
-    setMockInterviewSession(null);
-    setMockInterviewEvaluation(null);
-    setMockInterviewAnswer("");
-    setOutreachResult(null);
-    setCareerTransitionResult(null);
-    setProjectRoadmapResult(null);
-    setLearningPlanResult(null);
-    setLinkedInOptimizationResult(null);
-    setApplicationMaterialsResult(null);
-    setSelectedGeneratedOutput(null);
+    resetTargetDependentResults();
     return result;
   }
 
@@ -636,36 +554,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     try {
       const result = await uploadResume(accessToken, profile.id, file, deleteResumeAfterParsing);
       setUploadResult(result);
-      setQualityResult(null);
-      setAtsResult(null);
-      setCompletenessResult(null);
-      setGithubResult(null);
-      setPortfolioResult(null);
-      setLinkedInResult(null);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setPrivacySummary(null);
-      setPrivacyEvents([]);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setGeneratedOutputs([]);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      resetProfileDependentResults();
       setMessage(
         result.raw_document_retained === false
           ? "Resume parsed and raw file deleted."
@@ -690,38 +579,9 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       await deleteProfileData(accessToken, profile.id);
       setProfile(null);
       setUploadResult(null);
-      setQualityResult(null);
-      setAtsResult(null);
-      setCompletenessResult(null);
       setJobResult(null);
       setJobOptions([]);
-      setGithubResult(null);
-      setPortfolioResult(null);
-      setLinkedInResult(null);
-      setSkillGapResult(null);
-      setJobMatchResult(null);
-      setDashboardResult(null);
-      setReportResult(null);
-      setFullReportResult(null);
-      setPrivacySummary(null);
-      setPrivacyEvents([]);
-      setAiInterpretationResult(null);
-      setRewriteResult(null);
-      setTailoringResult(null);
-      setInterviewResult(null);
-      setClaimVerificationResult(null);
-      setMockInterviewSession(null);
-      setMockInterviewEvaluation(null);
-      setMockInterviewAnswer("");
-      setOutreachResult(null);
-      setCareerTransitionResult(null);
-      setProjectRoadmapResult(null);
-      setLearningPlanResult(null);
-      setLinkedInOptimizationResult(null);
-      setApplicationMaterialsResult(null);
-      setGeneratedOutputs([]);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      resetProfileDependentResults();
       setMessage("Profile data deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not delete profile data.");

@@ -53,7 +53,12 @@ export function ResumeUploadSummary({
   onCreateApplicationMaterials,
 }: ResumeUploadSummaryProps) {
   if (!uploadResult) {
-    return null;
+    return (
+      <div className="mt-5 border-t border-border pt-5 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Resume required for analysis.</p>
+        <p className="mt-1">Upload a PDF or DOCX resume after creating a profile. Snipe parses it once into reusable profile evidence.</p>
+      </div>
+    );
   }
 
   return (

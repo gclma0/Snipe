@@ -610,3 +610,15 @@ export type RagSearchResult = {
   embedding_model: string;
   citations: RagCitation[];
 };
+
+export type AIProviderStatus = {
+  provider: string;
+  model_name: string;
+  mode: string;
+  configured: boolean;
+  requires_api_key: boolean;
+  api_key_configured: boolean;
+  base_url_configured: boolean;
+  timeout_seconds: number;
+  issues: string[];
+};

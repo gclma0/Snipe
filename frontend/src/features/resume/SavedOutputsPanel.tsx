@@ -63,7 +63,12 @@ export function SavedOutputsPanel({
   onDelete,
 }: SavedOutputsPanelProps) {
   if (!outputs.length) {
-    return null;
+    return (
+      <div className="mt-5 border-t border-border pt-5 text-sm text-muted-foreground">
+        <h3 className="text-base font-semibold text-foreground">Saved outputs</h3>
+        <p className="mt-2">Generated reports, rewrites, tailoring packages, and interview materials will appear here after you create them.</p>
+      </div>
+    );
   }
 
   return (

@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 
 import { AuthPanel } from "@/features/auth/AuthPanel";
 import { ResumeWorkflow } from "@/features/resume/ResumeWorkflow";
+import { AIProviderStatusPanel } from "@/features/system/AIProviderStatusPanel";
 
 export function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export function App() {
             authentication, storage, and the normalized candidate profile are in place.
           </p>
           <AuthPanel onTokenChange={handleTokenChange} />
+          <AIProviderStatusPanel />
           <ResumeWorkflow accessToken={accessToken} />
         </div>
       </section>

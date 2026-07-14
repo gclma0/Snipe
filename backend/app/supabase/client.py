@@ -705,6 +705,25 @@ class SupabaseClient:
         rows = response.json()
         return rows[0] if rows else payload
 
+    def create_usage_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=10, trust_env=False) as client:
+            response = client.post(
+                f"{self.base_url}/rest/v1/usage_events",
+                headers={
+                    **self.headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseError(
+                f"Usage event insert failed: {response.text[:300]}",
+                operation="usage_event_insert",
+            )
+        rows = response.json()
+        return rows[0] if rows else payload
+
     def list_privacy_events(
         self,
         *,

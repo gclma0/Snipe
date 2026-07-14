@@ -324,6 +324,22 @@ Output types:
 - metadata_json.
 - created_at.
 
+### usage_events
+
+Anonymous product telemetry used for aggregate feature-health analysis.
+
+- id.
+- anonymous_session_id.
+- event_name.
+- surface.
+- metadata.
+- path.
+- created_at.
+
+This table intentionally does not include `user_id`, `profile_id`, email, raw
+resume text, job-description text, generated AI output, document content, source
+URLs, API keys, or JWTs.
+
 ### reports
 
 - id.
@@ -347,6 +363,7 @@ Output types:
 - Analyses and generated outputs may reference one target job description.
 - Evidence records connect profile facts back to sources.
 - RAG chunks are independent reference data but can be cited by generated outputs.
+- Usage events are intentionally not related to users or candidate profiles.
 
 ## Profile Versioning
 

@@ -24,8 +24,16 @@ describe("App", () => {
 
   it("loads non-secret AI provider status on request", async () => {
     const user = userEvent.setup();
-    globalThis.fetch = async () =>
-      new Response(
+    const fetchCalls: string[] = [];
+    globalThis.fetch = async (input) => {
+      fetchCalls.push(String(input));
+      if (String(input).endsWith("/usage/events")) {
+        return new Response(JSON.stringify({ accepted: true, event_name: "ai_provider_checked" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(
         JSON.stringify({
           provider: "local_template",
           model_name: "local-template-v1",
@@ -42,6 +50,7 @@ describe("App", () => {
           headers: { "Content-Type": "application/json" },
         },
       );
+    };
 
     render(<App />);
 
@@ -50,6 +59,7 @@ describe("App", () => {
     expect(await screen.findByText("Provider configuration is ready.")).toBeInTheDocument();
     expect(screen.getAllByText("local_template").length).toBeGreaterThan(0);
     expect(screen.queryByText(/api key value/i)).not.toBeInTheDocument();
+    expect(fetchCalls).toContain("http://localhost:8000/api/v1/usage/events");
   });
 
   it("shows backend request IDs on API errors", async () => {

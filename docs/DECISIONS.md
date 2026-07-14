@@ -136,3 +136,16 @@ Implications:
 - Skill taxonomies and scoring rules need profession tags.
 - Portfolio and project recommendations must support non-technical evidence.
 - GitHub and technical portfolio absence must not reduce scores when irrelevant.
+
+## ADR-013: Anonymous Aggregate Usage Analytics Only
+
+Decision: Product usage analytics use anonymous, aggregate events that are not linked to Supabase users or candidate profiles.
+
+Reason: The product needs free-tier operational insight without creating another store of career data or sensitive generated content.
+
+Implications:
+
+- Store a random session-scoped identifier, event name, surface, sanitized metadata, path without query strings, and timestamp.
+- Do not store `user_id`, `profile_id`, email, source URLs, resume text, job text, generated AI output, document content, API keys, or JWTs.
+- Analytics events are written through the backend service role; browser clients do not receive direct table policies.
+- Frontend analytics calls should not block user workflows.

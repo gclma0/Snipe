@@ -228,6 +228,15 @@ Requirements:
 - Add `X-Process-Time-ms` to backend responses for lightweight latency checks during smoke testing.
 - Do not include raw resume text, uploaded document content, API keys, or JWTs in diagnostic headers or logs.
 
+## Usage Analytics
+
+- Usage analytics are anonymous, aggregate product events stored in Supabase through the backend service role.
+- Events do not store `user_id`, `profile_id`, email, source URLs, resume text, job text, generated AI output, uploaded document content, API keys, or JWTs.
+- The frontend creates a random session-scoped identifier in `sessionStorage`; this identifier is not tied to Supabase Auth.
+- Backend validation accepts only compact event names, surface names, paths without query strings, and primitive metadata values.
+- Backend sanitization drops sensitive metadata keys and unsupported nested values before storage.
+- Analytics calls are fire-and-forget from the frontend so they never block the user workflow.
+
 ## Testing Strategy
 
 Backend tests:

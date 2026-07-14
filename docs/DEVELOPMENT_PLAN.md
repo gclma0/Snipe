@@ -32,6 +32,7 @@ Completed hardening and polish:
 - Longer frontend integration coverage now exercises profile creation, resume upload, target-job analysis, readiness scoring, AI generation, saved-output refresh, and saved-output detail viewing.
 - External LLM provider configuration health validates supported provider names, required model settings, API key presence, placeholder key values, and base URL format without exposing secrets or making paid network calls.
 - First-time UX copy and empty states have been improved for profile, resume, saved-output, target-job, job-match, and reference-library flows.
+- Anonymous aggregate usage analytics now record non-content product events without storing user IDs, profile IDs, raw documents, source URLs, or generated AI outputs.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

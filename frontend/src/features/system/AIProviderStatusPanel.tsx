@@ -2,6 +2,7 @@ import { Activity, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { getAIProviderStatus, type AIProviderStatus } from "@/lib/api";
+import { trackUsageEvent } from "@/lib/usage";
 
 export function AIProviderStatusPanel() {
   const [status, setStatus] = useState<AIProviderStatus | null>(null);
@@ -14,6 +15,11 @@ export function AIProviderStatusPanel() {
     try {
       const result = await getAIProviderStatus();
       setStatus(result);
+      trackUsageEvent("ai_provider_checked", "system_panel", {
+        configured: result.configured,
+        mode: result.mode,
+        provider: result.provider,
+      });
     } catch (error) {
       setStatus(null);
       setMessage(error instanceof Error ? error.message : "Could not load AI provider status.");

@@ -14,6 +14,7 @@ from app.api.routes.profiles import router as profiles_router
 from app.api.routes.rag import router as rag_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.sources import router as sources_router
+from app.api.routes.usage import router as usage_router
 from app.core.config import Settings, get_settings
 from app.core.request_context import RequestContextMiddleware
 
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(rag_router, prefix="/api/v1")
     app.include_router(interview_router, prefix="/api/v1")
     app.include_router(privacy_router, prefix="/api/v1")
+    app.include_router(usage_router, prefix="/api/v1")
     return app
 
 

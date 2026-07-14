@@ -345,6 +345,28 @@ by the user. Records a privacy event.
 Deletes the user's application data according to the product policy. Records a
 best-effort privacy event before deletion.
 
+## Usage
+
+### POST `/usage/events`
+
+Accepts an anonymous, aggregate product usage event.
+
+Authentication is not required. The frontend sends a random session-scoped ID
+from `sessionStorage`; the endpoint does not store Supabase user IDs or profile
+IDs.
+
+Body:
+
+- `anonymous_session_id`: random session identifier.
+- `event_name`: compact snake_case event name.
+- `surface`: compact snake_case UI or backend surface name.
+- `metadata`: optional primitive-only metadata. Sensitive keys are dropped.
+- `path`: optional frontend path. Query strings and fragments are removed.
+
+The endpoint must not receive or store resume text, job-description text,
+generated AI output, uploaded document content, source URLs, emails, API keys,
+JWTs, `user_id`, or `profile_id`.
+
 ## Admin Or Internal Endpoints
 
 Admin endpoints should be avoided in MVP unless necessary. Future internal endpoints may support RAG ingestion, taxonomy updates, and scoring-rule versioning.

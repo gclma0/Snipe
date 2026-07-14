@@ -24,6 +24,12 @@ PRIVACY_EVENTS_MIGRATION = (
     / "migrations"
     / "004_privacy_events.sql"
 )
+USAGE_EVENTS_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "supabase"
+    / "migrations"
+    / "005_usage_events.sql"
+)
 
 
 def test_initial_migration_defines_core_tables_and_storage_bucket() -> None:
@@ -94,3 +100,15 @@ def test_privacy_events_migration_defines_audit_table_and_rls() -> None:
     assert "privacy_events_select_own" in sql
     assert "privacy_events_insert_own" in sql
     assert "auth.uid() = user_id" in sql
+
+
+def test_usage_events_migration_defines_anonymous_telemetry_table_without_user_scope() -> None:
+    sql = USAGE_EVENTS_MIGRATION.read_text(encoding="utf-8").lower()
+
+    assert "create table if not exists public.usage_events" in sql
+    assert "anonymous_session_id text not null" in sql
+    assert "event_name text not null" in sql
+    assert "metadata jsonb not null" in sql
+    assert "alter table public.usage_events enable row level security" in sql
+    assert "user_id" not in sql
+    assert "profile_id" not in sql

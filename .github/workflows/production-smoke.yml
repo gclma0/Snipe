@@ -1,0 +1,38 @@
+name: Production Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: "Deployed frontend URL"
+        required: true
+        type: string
+      backend_url:
+        description: "Deployed backend URL"
+        required: true
+        type: string
+      allow_unconfigured_ai:
+        description: "Do not fail if the AI provider reports configuration issues"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  smoke:
+    name: Production smoke
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run smoke checks
+        shell: pwsh
+        run: |
+          $smokeArgs = @(
+            "-FrontendUrl", "${{ inputs.frontend_url }}",
+            "-BackendUrl", "${{ inputs.backend_url }}"
+          )
+          if ("${{ inputs.allow_unconfigured_ai }}" -eq "true") {
+            $smokeArgs += "-AllowUnconfiguredAI"
+          }
+          & .\scripts\production-smoke.ps1 @smokeArgs

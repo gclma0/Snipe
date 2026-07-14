@@ -21,6 +21,19 @@ The script verifies:
 - Backend `GET /api/v1/health/ai-provider` returns non-secret provider status.
 - AI provider status does not expose raw API key fields.
 
+## GitHub Actions
+
+The same smoke check can be run manually from GitHub:
+
+1. Open the repository in GitHub.
+2. Go to `Actions`.
+3. Select `Production Smoke`.
+4. Click `Run workflow`.
+5. Enter the deployed frontend URL.
+6. Enter the deployed backend URL.
+7. Leave `allow_unconfigured_ai` off unless you are diagnosing an intentionally incomplete external provider setup.
+8. Click `Run workflow`.
+
 ## Manual Browser Checks
 
 1. Open the deployed frontend.

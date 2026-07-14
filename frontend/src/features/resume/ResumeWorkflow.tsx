@@ -10,9 +10,7 @@ import { TargetJobForm } from "@/features/resume/TargetJobForm";
 import {
   downloadJson,
   downloadTextFile,
-  exportContentForOutput,
   fullReportFilename,
-  generatedOutputFilename,
 } from "@/features/resume/generatedOutputFormatting";
 import {
   GitHubValues,
@@ -21,6 +19,7 @@ import {
   PortfolioValues,
   ProfileValues,
 } from "@/features/resume/resumeWorkflowForms";
+import { useGeneratedOutputs } from "@/features/resume/useGeneratedOutputs";
 import { useResumeWorkflowDerivedState } from "@/features/resume/useResumeWorkflowDerivedState";
 import { useResumeWorkflowForms } from "@/features/resume/useResumeWorkflowForms";
 import {
@@ -33,7 +32,6 @@ import {
   ClaimVerificationResult,
   DeterministicScoreResult,
   FullCareerReportResult,
-  GeneratedOutput,
   GitHubSourceResult,
   InterviewPrepResult,
   JobDescriptionResult,
@@ -79,15 +77,12 @@ import {
   createResumeRewriteSuggestions,
   createResumeTailoringPackage,
   createProfile,
-  deleteGeneratedOutput,
   deleteProfileData,
   deleteProfileDocuments,
   deleteRagDocument,
   exportProfileData,
   getPrivacyDataSummary,
-  getGeneratedOutput,
   getSavedJobMatch,
-  listGeneratedOutputs,
   listJobDescriptions,
   listPrivacyEvents,
   listSavedJobMatches,
@@ -151,16 +146,10 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [editingRagDocument, setEditingRagDocument] = useState<RagDocumentSummary | null>(null);
   const [ragSearchResult, setRagSearchResult] = useState<RagSearchResult | null>(null);
   const [jobRagSearchResult, setJobRagSearchResult] = useState<RagSearchResult | null>(null);
-  const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutput[]>([]);
-  const [generatedOutputFilter, setGeneratedOutputFilter] = useState("all");
-  const [selectedGeneratedOutput, setSelectedGeneratedOutput] = useState<GeneratedOutput | null>(null);
-  const [deletingGeneratedOutputId, setDeletingGeneratedOutputId] = useState<string | null>(null);
   const [deletingRagDocumentId, setDeletingRagDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
-  const [isSavedOutputsLoading, setIsSavedOutputsLoading] = useState(false);
-  const [isHistoryRefreshing, setIsHistoryRefreshing] = useState(false);
   const [isJobMatchHistoryLoading, setIsJobMatchHistoryLoading] = useState(false);
   const [deleteResumeAfterParsing, setDeleteResumeAfterParsing] = useState(false);
   const [deleteLinkedInAfterParsing, setDeleteLinkedInAfterParsing] = useState(false);
@@ -173,11 +162,6 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
   const [ragQuery, setRagQuery] = useState("");
   const [ragLimit, setRagLimit] = useState(5);
   const [ragSearchSourceTypes, setRagSearchSourceTypes] = useState<RagSourceType[]>([]);
-  const { activeTargetLabel, filteredGeneratedOutputs } = useResumeWorkflowDerivedState({
-    generatedOutputFilter,
-    generatedOutputs,
-    jobResult,
-  });
   const {
     profileForm: form,
     jobForm,
@@ -185,6 +169,34 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     portfolioForm,
     linkedInForm,
   } = useResumeWorkflowForms();
+  const {
+    clearSelectedGeneratedOutput,
+    deletingGeneratedOutputId,
+    generatedOutputFilter,
+    generatedOutputs,
+    handleCopyGeneratedOutput,
+    handleDeleteGeneratedOutput,
+    handleDownloadGeneratedOutput,
+    handleLoadGeneratedOutputs,
+    handleOpenGeneratedOutput,
+    isHistoryRefreshing,
+    isSavedOutputsLoading,
+    loadGeneratedOutputsForProfile,
+    refreshGeneratedOutputs,
+    resetGeneratedOutputHistory,
+    selectedGeneratedOutput,
+    setGeneratedOutputFilter,
+    setLoadedGeneratedOutputs,
+  } = useGeneratedOutputs({
+    accessToken,
+    profileId: profile?.id ?? null,
+    onMessage: setMessage,
+  });
+  const { activeTargetLabel, filteredGeneratedOutputs } = useResumeWorkflowDerivedState({
+    generatedOutputFilter,
+    generatedOutputs,
+    jobResult,
+  });
 
   function resetOptionalSourceResults() {
     setGithubResult(null);
@@ -212,12 +224,6 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
     setLearningPlanResult(null);
     setLinkedInOptimizationResult(null);
     setApplicationMaterialsResult(null);
-  }
-
-  function resetGeneratedOutputHistory() {
-    setGeneratedOutputs([]);
-    setGeneratedOutputFilter("all");
-    setSelectedGeneratedOutput(null);
   }
 
   function resetAnalysisResults() {
@@ -252,7 +258,7 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       resetGeneratedOutputHistory();
       return;
     }
-    setSelectedGeneratedOutput(null);
+    clearSelectedGeneratedOutput();
   }
 
   async function handleCreateProfile(values: ProfileValues) {
@@ -293,16 +299,14 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
         return;
       }
 
-      const outputs = await listGeneratedOutputs(accessToken, latestProfile.id);
+      const outputs = await loadGeneratedOutputsForProfile(accessToken, latestProfile.id);
       const jobs = await listJobDescriptions(accessToken, latestProfile.id);
       setProfile(latestProfile);
       setUploadResult(null);
       setJobResult(null);
       setJobOptions(jobs);
       resetProfileDependentResults();
-      setGeneratedOutputs(outputs);
-      setGeneratedOutputFilter("all");
-      setSelectedGeneratedOutput(null);
+      setLoadedGeneratedOutputs(outputs);
       setMessage(outputs.length ? "Latest profile and saved outputs loaded." : "Latest profile loaded. No saved outputs found yet.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load latest profile.");
@@ -703,99 +707,6 @@ export function ResumeWorkflow({ accessToken }: ResumeWorkflowProps) {
       setIsBusy(false);
       setBusyLabel(null);
     }
-  }
-
-  async function handleLoadGeneratedOutputs() {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsSavedOutputsLoading(true);
-    setMessage(null);
-    try {
-      const result = await listGeneratedOutputs(accessToken, profile.id);
-      setGeneratedOutputs(result);
-      setSelectedGeneratedOutput(null);
-      setMessage(result.length ? "Saved outputs loaded." : "No saved outputs found yet.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load saved outputs.");
-    } finally {
-      setIsSavedOutputsLoading(false);
-    }
-  }
-
-  async function refreshGeneratedOutputs(token: string, profileId: string) {
-    setIsHistoryRefreshing(true);
-    try {
-      const result = await listGeneratedOutputs(token, profileId);
-      setGeneratedOutputs(result);
-      setSelectedGeneratedOutput((current) => {
-        if (!current) {
-          return null;
-        }
-        return result.find((item) => item.id === current.id) ?? null;
-      });
-    } catch {
-      // Refreshing history should not hide a successful generation result.
-    } finally {
-      setIsHistoryRefreshing(false);
-    }
-  }
-
-  async function handleCopyGeneratedOutput(output: GeneratedOutput) {
-    const content = exportContentForOutput(output);
-    try {
-      await navigator.clipboard.writeText(content);
-      setMessage("Saved output copied.");
-    } catch {
-      setMessage("Could not copy saved output.");
-    }
-  }
-
-  async function handleOpenGeneratedOutput(output: GeneratedOutput) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setIsSavedOutputsLoading(true);
-    setMessage(null);
-    try {
-      const result = await getGeneratedOutput(accessToken, profile.id, output.id);
-      setSelectedGeneratedOutput(result);
-      setGeneratedOutputs((current) =>
-        current.map((item) => (item.id === result.id ? result : item)),
-      );
-      setMessage("Saved output opened.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not open saved output.");
-    } finally {
-      setIsSavedOutputsLoading(false);
-    }
-  }
-
-  async function handleDeleteGeneratedOutput(output: GeneratedOutput) {
-    if (!accessToken || !profile) {
-      return;
-    }
-
-    setDeletingGeneratedOutputId(output.id);
-    setMessage(null);
-    try {
-      await deleteGeneratedOutput(accessToken, profile.id, output.id);
-      setGeneratedOutputs((current) => current.filter((item) => item.id !== output.id));
-      setSelectedGeneratedOutput((current) => (current?.id === output.id ? null : current));
-      setMessage("Saved output deleted.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not delete saved output.");
-    } finally {
-      setDeletingGeneratedOutputId(null);
-    }
-  }
-
-  function handleDownloadGeneratedOutput(output: GeneratedOutput) {
-    const content = exportContentForOutput(output);
-    downloadTextFile(generatedOutputFilename(output), content, "text/markdown;charset=utf-8");
-    setMessage("Saved output downloaded.");
   }
 
   function handleDownloadFullReport() {

@@ -40,6 +40,8 @@ Operational prerequisites before announcing a production URL:
 - Apply all Supabase migrations through `005_usage_events.sql`.
 - Confirm backend environment variables are set in Render.
 - Confirm frontend environment variables are set in Vercel.
+- Confirm `VITE_ADMIN_EMAILS` contains only trusted admin/test-operator emails.
+- Confirm backend `ADMIN_EMAILS` contains the same trusted admin/test-operator emails.
 - Run the automated production smoke test.
 - Run the in-app smoke test signed out and signed in.
 - Confirm privacy export, delete documents, delete profile data, and saved-output history still work in production.

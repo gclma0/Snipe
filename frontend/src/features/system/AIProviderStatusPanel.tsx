@@ -118,10 +118,15 @@ export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPa
   }
 
   async function handleLoadUsageSummary() {
+    if (!accessToken) {
+      setMessage("Sign in as an admin to load usage summary.");
+      return;
+    }
+
     setIsLoadingUsage(true);
     setMessage(null);
     try {
-      const summary = await getUsageSummary(7);
+      const summary = await getUsageSummary(accessToken, 7);
       setUsageSummary(summary);
       trackUsageEvent("usage_summary_loaded", "system_panel", {
         days: summary.days,

@@ -32,10 +32,15 @@ class Settings(BaseSettings):
     public_rate_limit_enabled: bool = True
     public_rate_limit_requests: int = Field(default=60, ge=1, le=1000)
     public_rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
+    admin_emails: str = ""
 
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.backend_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def admin_email_list(self) -> list[str]:
+        return [email.strip().lower() for email in self.admin_emails.split(",") if email.strip()]
 
 
 @lru_cache

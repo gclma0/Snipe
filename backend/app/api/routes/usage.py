@@ -4,11 +4,15 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 
+from app.auth.dependencies import AuthenticatedUser, get_current_user, get_request_settings
+from app.core.config import Settings
 from app.supabase.client import SupabaseClient, SupabaseError
 from app.supabase.dependencies import get_supabase_client
 
 router = APIRouter(prefix="/usage", tags=["usage"])
 Supabase = Depends(get_supabase_client)
+CurrentUser = Depends(get_current_user)
+RequestSettings = Depends(get_request_settings)
 
 MAX_METADATA_KEYS = 12
 MAX_METADATA_STRING_LENGTH = 120
@@ -96,8 +100,13 @@ def create_usage_event(
 @router.get("/summary", response_model=UsageSummaryResponse)
 def get_usage_summary(
     days: int = Query(default=7, ge=1, le=90),
+    user: AuthenticatedUser = CurrentUser,
+    settings: Settings = RequestSettings,
     supabase: SupabaseClient = Supabase,
 ) -> UsageSummaryResponse:
+    if not _is_admin(user=user, settings=settings):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+
     since = datetime.now(UTC) - timedelta(days=days)
     try:
         rows = supabase.list_usage_events_for_summary(since_iso=since.isoformat(), limit=1000)
@@ -157,3 +166,7 @@ def _count_by_key(rows: list[dict[str, Any]], key: str) -> list[UsageCount]:
         UsageCount(name=name, count=count)
         for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     ]
+
+
+def _is_admin(*, user: AuthenticatedUser, settings: Settings) -> bool:
+    return bool(user.email and user.email.strip().lower() in settings.admin_email_list)

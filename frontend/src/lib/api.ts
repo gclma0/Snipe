@@ -181,8 +181,11 @@ export async function getBackendHealthStatus() {
   };
 }
 
-export function getUsageSummary(days = 7) {
-  return publicRequest<UsageSummary>(`/usage/summary?days=${encodeURIComponent(String(days))}`);
+export function getUsageSummary(token: string, days = 7) {
+  return request<UsageSummary>(
+    `/usage/summary?days=${encodeURIComponent(String(days))}`,
+    token,
+  );
 }
 
 export function listProfiles(token: string) {

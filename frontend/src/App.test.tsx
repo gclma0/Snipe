@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { App } from "@/App";
+import { AIProviderStatusPanel } from "@/features/system/AIProviderStatusPanel";
 
 const originalFetch = globalThis.fetch;
 
@@ -18,8 +19,18 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: /Snipe/i })).toBeInTheDocument();
     expect(screen.getByText(/Career intelligence workspace/i)).toBeInTheDocument();
     expect(screen.getByText(/evidence-backed candidate profile/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Supabase authentication/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /System diagnostics/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Account access/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Register$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /System diagnostics/i })).not.toBeInTheDocument();
+  });
+
+  it("switches the auth panel to registration mode", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /^Register$/i }));
+
+    expect(screen.getByRole("button", { name: /Create account/i })).toBeInTheDocument();
   });
 
   it("loads non-secret system diagnostics on request", async () => {
@@ -70,7 +81,7 @@ describe("App", () => {
       );
     };
 
-    render(<App />);
+    render(<AIProviderStatusPanel accessToken={null} />);
 
     await user.click(screen.getByRole("button", { name: /Check status/i }));
 
@@ -93,7 +104,7 @@ describe("App", () => {
         },
       });
 
-    render(<App />);
+    render(<AIProviderStatusPanel accessToken={null} />);
 
     await user.click(screen.getByRole("button", { name: /Check status/i }));
 
@@ -148,7 +159,7 @@ describe("App", () => {
       );
     };
 
-    render(<App />);
+    render(<AIProviderStatusPanel accessToken={null} />);
 
     await user.click(screen.getByRole("button", { name: /Run smoke test/i }));
 
@@ -189,7 +200,7 @@ describe("App", () => {
       });
     };
 
-    render(<App />);
+    render(<AIProviderStatusPanel accessToken="token" />);
 
     await user.click(screen.getByRole("button", { name: /Load usage summary/i }));
 
@@ -199,5 +210,14 @@ describe("App", () => {
     expect(screen.getByText("system_diagnostics_checked")).toBeInTheDocument();
     expect(screen.queryByText(/profile_id/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/anonymous_session_id/i)).not.toBeInTheDocument();
+  });
+
+  it("requires an admin session token before loading usage summary", async () => {
+    const user = userEvent.setup();
+    render(<AIProviderStatusPanel accessToken={null} />);
+
+    await user.click(screen.getByRole("button", { name: /Load usage summary/i }));
+
+    expect(await screen.findByText("Sign in as an admin to load usage summary.")).toBeInTheDocument();
   });
 });

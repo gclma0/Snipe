@@ -380,6 +380,7 @@ JWTs, `user_id`, or `profile_id`.
 ### GET `/usage/summary`
 
 Returns anonymous aggregate product usage counts for a bounded recent window.
+Requires an authenticated user whose email is listed in backend `ADMIN_EMAILS`.
 
 Query parameters:
 

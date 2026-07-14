@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.core.config import Settings
 from app.main import create_app
 from app.supabase.client import SupabaseError
@@ -29,9 +30,16 @@ class FakeSupabaseClient:
         return self.events[:limit]
 
 
-def client_with_fake_supabase(fake: FakeSupabaseClient) -> TestClient:
-    app = create_app(Settings(supabase_url=None))
+def client_with_fake_supabase(fake: FakeSupabaseClient, *, admin_email: str | None = "admin@example.com") -> TestClient:
+    app = create_app(Settings(supabase_url=None, admin_emails="admin@example.com"))
     app.dependency_overrides[get_supabase_client] = lambda: fake
+    if admin_email is not None:
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id="00000000-0000-0000-0000-000000000001",
+            email=admin_email,
+            role="authenticated",
+            claims={},
+        )
     return TestClient(app)
 
 
@@ -148,3 +156,20 @@ def test_usage_summary_reports_supabase_failures() -> None:
 
     assert response.status_code == 502
     assert response.json()["detail"] == "Supabase usage_event_summary failed."
+
+
+def test_usage_summary_requires_authentication() -> None:
+    client = client_with_fake_supabase(FakeSupabaseClient(), admin_email=None)
+
+    response = client.get("/api/v1/usage/summary")
+
+    assert response.status_code == 401
+
+
+def test_usage_summary_rejects_non_admin_users() -> None:
+    client = client_with_fake_supabase(FakeSupabaseClient(), admin_email="user@example.com")
+
+    response = client.get("/api/v1/usage/summary")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin access required."

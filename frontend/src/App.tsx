@@ -4,9 +4,15 @@ import { useCallback, useState } from "react";
 import { AuthPanel } from "@/features/auth/AuthPanel";
 import { ResumeWorkflow } from "@/features/resume/ResumeWorkflow";
 import { AIProviderStatusPanel } from "@/features/system/AIProviderStatusPanel";
+import { isAdminEmail } from "@/lib/env";
 
 export function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const handleSessionChange = useCallback((session: { token: string | null; email: string | null }) => {
+    setAccessToken(session.token);
+    setUserEmail(session.email);
+  }, []);
   const handleTokenChange = useCallback((token: string | null) => {
     setAccessToken(token);
   }, []);
@@ -29,8 +35,8 @@ export function App() {
             generate tailored career materials, and keep saved outputs reusable without
             resending raw documents.
           </p>
-          <AuthPanel onTokenChange={handleTokenChange} />
-          <AIProviderStatusPanel accessToken={accessToken} />
+          <AuthPanel onSessionChange={handleSessionChange} onTokenChange={handleTokenChange} />
+          {isAdminEmail(userEmail) ? <AIProviderStatusPanel accessToken={accessToken} /> : null}
           <ResumeWorkflow accessToken={accessToken} />
         </div>
       </section>

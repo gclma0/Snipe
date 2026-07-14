@@ -78,6 +78,9 @@ Supabase and AI provider values are placeholders until the relevant milestones b
 Only commit `.env.example` files. Actual `.env` files are ignored by git and
 must contain local or deployment-specific values only.
 
+Set `VITE_ADMIN_EMAILS` to a comma-separated list of admin/test-operator email
+addresses if you need to see the frontend system diagnostics panel.
+
 ## Production Smoke Check
 
 After deployment, run:

@@ -13,18 +13,18 @@ It must not contain secrets. Do not paste Supabase service-role keys, JWTs, AI p
 Use the deployed frontend first.
 
 1. Open the deployed frontend.
-2. Open `System diagnostics`.
-3. Click `Check status`.
-4. Confirm backend health is ok.
-5. Confirm a request ID is shown.
-6. Confirm AI provider status is either ready or shows a clear configuration issue.
-7. Click `Run smoke test`.
-8. Confirm backend, AI provider, Supabase frontend config, and session checks render.
-9. Sign in with a test user.
-10. Click `Run smoke test` again.
-11. Confirm authenticated backend connectivity passes.
-12. Click `Load usage summary`.
-13. Confirm only aggregate counts are shown.
+2. Sign in with an email listed in both `VITE_ADMIN_EMAILS` and backend `ADMIN_EMAILS`.
+3. Open `System diagnostics`.
+4. Click `Check status`.
+5. Confirm backend health is ok.
+6. Confirm a request ID is shown.
+7. Confirm AI provider status is either ready or shows a clear configuration issue.
+8. Click `Run smoke test`.
+9. Confirm backend, AI provider, Supabase frontend config, and session checks render.
+10. Click `Load usage summary`.
+11. Confirm only aggregate counts are shown.
+
+Normal users should not see the `System diagnostics` panel.
 
 ### Automated Smoke Test
 
@@ -79,6 +79,8 @@ Symptoms:
 Check:
 
 - `VITE_API_BASE_URL` points to the deployed backend `/api/v1` base path.
+- `VITE_ADMIN_EMAILS` contains only trusted admin/test-operator emails that should see system diagnostics.
+- Backend `ADMIN_EMAILS` contains the same trusted admin/test-operator emails that may call admin-only operations endpoints.
 - Backend CORS includes the deployed frontend origin.
 - Render service is awake and has not failed startup.
 - Browser devtools network tab shows the expected backend URL.

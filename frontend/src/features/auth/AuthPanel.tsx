@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LogIn, LogOut, ShieldCheck } from "lucide-react";
+import { LogIn, LogOut, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,11 +16,13 @@ type SignInValues = z.infer<typeof signInSchema>;
 
 type AuthPanelProps = {
   onTokenChange?: (token: string | null) => void;
+  onSessionChange?: (session: { token: string | null; email: string | null }) => void;
 };
 
-export function AuthPanel({ onTokenChange }: AuthPanelProps) {
+export function AuthPanel({ onSessionChange, onTokenChange }: AuthPanelProps) {
   const [email, setEmail] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [mode, setMode] = useState<"sign_in" | "register">("sign_in");
   const form = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -37,15 +39,23 @@ export function AuthPanel({ onTokenChange }: AuthPanelProps) {
     supabase.auth.getSession().then(({ data }) => {
       setEmail(data.session?.user.email ?? null);
       onTokenChange?.(data.session?.access_token ?? null);
+      onSessionChange?.({
+        token: data.session?.access_token ?? null,
+        email: data.session?.user.email ?? null,
+      });
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user.email ?? null);
       onTokenChange?.(session?.access_token ?? null);
+      onSessionChange?.({
+        token: session?.access_token ?? null,
+        email: session?.user.email ?? null,
+      });
     });
 
     return () => data.subscription.unsubscribe();
-  }, [onTokenChange]);
+  }, [onSessionChange, onTokenChange]);
 
   if (!isSupabaseConfigured || !supabase) {
     return (
@@ -73,6 +83,19 @@ export function AuthPanel({ onTokenChange }: AuthPanelProps) {
     setMessage(error ? error.message : "Signed in.");
   }
 
+  async function handleRegister(values: SignInValues) {
+    if (!supabase) {
+      return;
+    }
+
+    setMessage(null);
+    const { error } = await supabase.auth.signUp({
+      email: values.email,
+      password: values.password,
+    });
+    setMessage(error ? error.message : "Registration submitted. Check your email if confirmation is enabled.");
+  }
+
   async function handleSignOut() {
     if (!supabase) {
       return;
@@ -84,7 +107,7 @@ export function AuthPanel({ onTokenChange }: AuthPanelProps) {
 
   return (
     <section className="mt-10 max-w-md border border-border bg-white p-5">
-      <h2 className="text-base font-semibold">Supabase authentication</h2>
+      <h2 className="text-base font-semibold">Account access</h2>
       {email ? (
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">{email}</p>
@@ -94,7 +117,32 @@ export function AuthPanel({ onTokenChange }: AuthPanelProps) {
           </button>
         </div>
       ) : (
-        <form className="mt-4 space-y-4" onSubmit={form.handleSubmit(handleSignIn)}>
+        <form
+          className="mt-4 space-y-4"
+          onSubmit={form.handleSubmit(mode === "sign_in" ? handleSignIn : handleRegister)}
+        >
+          <div className="inline-flex border border-border">
+            <button
+              className={mode === "sign_in" ? "bg-foreground px-3 py-2 text-sm font-medium text-background" : "px-3 py-2 text-sm font-medium"}
+              type="button"
+              onClick={() => {
+                setMode("sign_in");
+                setMessage(null);
+              }}
+            >
+              Sign in
+            </button>
+            <button
+              className={mode === "register" ? "bg-foreground px-3 py-2 text-sm font-medium text-background" : "px-3 py-2 text-sm font-medium"}
+              type="button"
+              onClick={() => {
+                setMode("register");
+                setMessage(null);
+              }}
+            >
+              Register
+            </button>
+          </div>
           <label className="block text-sm font-medium">
             Email
             <input className="mt-1 w-full border border-border px-3 py-2" type="email" {...form.register("email")} />
@@ -110,8 +158,8 @@ export function AuthPanel({ onTokenChange }: AuthPanelProps) {
             <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
           ) : null}
           <button className="inline-flex items-center gap-2 bg-foreground px-4 py-2 text-sm font-medium text-background" type="submit">
-            <LogIn aria-hidden="true" className="h-4 w-4" />
-            Sign in
+            {mode === "sign_in" ? <LogIn aria-hidden="true" className="h-4 w-4" /> : <UserPlus aria-hidden="true" className="h-4 w-4" />}
+            {mode === "sign_in" ? "Sign in" : "Create account"}
           </button>
         </form>
       )}

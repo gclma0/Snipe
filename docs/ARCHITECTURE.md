@@ -228,6 +228,8 @@ Requirements:
 - Add `X-Process-Time-ms` to backend responses for lightweight latency checks during smoke testing.
 - Rate limit public health and usage endpoints with an in-memory per-process limiter to reduce free-tier abuse without adding paid infrastructure.
 - Expose backend health, request ID, process time, and AI provider readiness in the frontend system diagnostics panel.
+- Show the frontend system diagnostics panel only to signed-in admin emails listed in `VITE_ADMIN_EMAILS`.
+- Require backend `ADMIN_EMAILS` authorization for operational usage summaries even if a client can call the endpoint directly.
 - Provide an in-app smoke test that checks deployed frontend configuration, backend health, AI provider readiness, Supabase browser configuration, browser auth session state, and authenticated backend profile-list connectivity when signed in.
 - Do not include raw resume text, uploaded document content, API keys, or JWTs in diagnostic headers or logs.
 

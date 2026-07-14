@@ -24,6 +24,10 @@ The check validates provider support, required model name, required API key pres
 
 The frontend exposes this check in the AI provider status panel so configuration can be verified without using Swagger or command-line tools.
 
+The frontend system diagnostics panel also calls `GET /health` and displays the
+returned request ID and process time so production support checks can be copied
+without exposing secrets.
+
 ## Profiles
 
 ### POST `/profiles`

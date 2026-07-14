@@ -5,6 +5,15 @@ export type CandidateProfile = {
   profile_status: string;
 };
 
+export type BackendHealthStatus = {
+  status: string;
+  service: string;
+  version: string;
+  environment: string;
+  request_id: string | null;
+  process_time_ms: string | null;
+};
+
 export type ResumeUploadResult = {
   source_id: string | null;
   profile_id: string;

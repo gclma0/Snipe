@@ -226,6 +226,7 @@ Requirements:
 - Add `X-Request-ID` to every backend response so frontend reports, Render logs, and API traces can be correlated without paid observability tooling.
 - Preserve a caller-provided `X-Request-ID` when it is present and reasonably sized; otherwise generate a UUID-based value.
 - Add `X-Process-Time-ms` to backend responses for lightweight latency checks during smoke testing.
+- Expose backend health, request ID, process time, and AI provider readiness in the frontend system diagnostics panel.
 - Do not include raw resume text, uploaded document content, API keys, or JWTs in diagnostic headers or logs.
 
 ## Usage Analytics

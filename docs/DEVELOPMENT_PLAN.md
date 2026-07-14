@@ -33,6 +33,7 @@ Completed hardening and polish:
 - External LLM provider configuration health validates supported provider names, required model settings, API key presence, placeholder key values, and base URL format without exposing secrets or making paid network calls.
 - First-time UX copy and empty states have been improved for profile, resume, saved-output, target-job, job-match, and reference-library flows.
 - Anonymous aggregate usage analytics now record non-content product events without storing user IDs, profile IDs, raw documents, source URLs, or generated AI outputs.
+- The frontend system diagnostics panel now verifies backend health, exposes request IDs/process timing, and checks AI provider readiness without exposing secrets.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

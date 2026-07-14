@@ -57,6 +57,7 @@ export type {
   RagSearchResult,
   RagSourceType,
   AIProviderStatus,
+  BackendHealthStatus,
 } from "./apiTypes";
 
 import type {
@@ -100,6 +101,7 @@ import type {
   RagSearchResult,
   RagSourceType,
   AIProviderStatus,
+  BackendHealthStatus,
 } from "./apiTypes";
 
 const REQUEST_ID_HEADER = "X-Request-ID";
@@ -160,6 +162,21 @@ function formatApiErrorMessage(message: string, requestId: string | null) {
 
 export function getAIProviderStatus() {
   return publicRequest<AIProviderStatus>("/health/ai-provider");
+}
+
+export async function getBackendHealthStatus() {
+  const response = await fetch(`${env.apiBaseUrl}/health`);
+
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
+
+  const body = (await response.json()) as Omit<BackendHealthStatus, "request_id" | "process_time_ms">;
+  return {
+    ...body,
+    request_id: response.headers.get(REQUEST_ID_HEADER),
+    process_time_ms: response.headers.get("X-Process-Time-ms"),
+  };
 }
 
 export function listProfiles(token: string) {

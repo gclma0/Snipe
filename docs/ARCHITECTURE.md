@@ -227,6 +227,7 @@ Requirements:
 - Preserve a caller-provided `X-Request-ID` when it is present and reasonably sized; otherwise generate a UUID-based value.
 - Add `X-Process-Time-ms` to backend responses for lightweight latency checks during smoke testing.
 - Expose backend health, request ID, process time, and AI provider readiness in the frontend system diagnostics panel.
+- Provide an in-app smoke test that checks deployed frontend configuration, backend health, AI provider readiness, Supabase browser configuration, browser auth session state, and authenticated backend profile-list connectivity when signed in.
 - Do not include raw resume text, uploaded document content, API keys, or JWTs in diagnostic headers or logs.
 
 ## Usage Analytics

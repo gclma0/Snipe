@@ -30,7 +30,7 @@ export function App() {
             resending raw documents.
           </p>
           <AuthPanel onTokenChange={handleTokenChange} />
-          <AIProviderStatusPanel />
+          <AIProviderStatusPanel accessToken={accessToken} />
           <ResumeWorkflow accessToken={accessToken} />
         </div>
       </section>

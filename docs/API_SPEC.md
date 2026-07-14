@@ -28,6 +28,11 @@ The frontend system diagnostics panel also calls `GET /health` and displays the
 returned request ID and process time so production support checks can be copied
 without exposing secrets.
 
+The same panel can run an in-app smoke test. The smoke test reuses public health
+checks and, when the user is signed in, calls `GET /profiles` only to verify
+authenticated backend connectivity and profile count. It does not display
+profile contents.
+
 ## Profiles
 
 ### POST `/profiles`

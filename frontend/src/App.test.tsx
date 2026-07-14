@@ -99,4 +99,66 @@ describe("App", () => {
 
     expect(await screen.findByText("Provider configuration failed. Request ID: req-test-123")).toBeInTheDocument();
   });
+
+  it("runs an unauthenticated production smoke test from the system panel", async () => {
+    const user = userEvent.setup();
+    const fetchCalls: string[] = [];
+    globalThis.fetch = async (input) => {
+      fetchCalls.push(String(input));
+      if (String(input).endsWith("/health")) {
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            service: "Snipe API",
+            version: "0.1.0",
+            environment: "production",
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "X-Request-ID": "req-smoke-123",
+              "X-Process-Time-ms": "2.50",
+            },
+          },
+        );
+      }
+      if (String(input).endsWith("/usage/events")) {
+        return new Response(JSON.stringify({ accepted: true, event_name: "production_smoke_test_ran" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          provider: "openai_compatible",
+          model_name: "free-model",
+          mode: "external",
+          configured: true,
+          requires_api_key: true,
+          api_key_configured: true,
+          base_url_configured: true,
+          timeout_seconds: 30,
+          issues: [],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    };
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /Run smoke test/i }));
+
+    expect(await screen.findByText("Smoke test result")).toBeInTheDocument();
+    expect(screen.getByText("Backend API")).toBeInTheDocument();
+    expect(screen.getAllByText(/req-smoke-123/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("AI provider")).toBeInTheDocument();
+    expect(screen.getByText("Supabase frontend")).toBeInTheDocument();
+    expect(screen.getByText("Supabase session")).toBeInTheDocument();
+    expect(screen.getByText("Sign in to test authenticated backend connectivity.")).toBeInTheDocument();
+    expect(fetchCalls).toContain("http://localhost:8000/api/v1/usage/events");
+  });
 });

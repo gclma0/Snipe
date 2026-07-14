@@ -34,6 +34,7 @@ Completed hardening and polish:
 - First-time UX copy and empty states have been improved for profile, resume, saved-output, target-job, job-match, and reference-library flows.
 - Anonymous aggregate usage analytics now record non-content product events without storing user IDs, profile IDs, raw documents, source URLs, or generated AI outputs.
 - The frontend system diagnostics panel now verifies backend health, exposes request IDs/process timing, and checks AI provider readiness without exposing secrets.
+- An in-app production smoke test now verifies frontend Supabase configuration, browser auth session state, backend health, AI provider readiness, and authenticated backend connectivity when signed in.
 
 ## Milestone 1: Project Foundation And Documentation Baseline
 

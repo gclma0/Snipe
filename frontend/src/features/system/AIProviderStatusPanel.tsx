@@ -1,14 +1,34 @@
 import { Activity, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
-import { getAIProviderStatus, getBackendHealthStatus, type AIProviderStatus, type BackendHealthStatus } from "@/lib/api";
+import {
+  getAIProviderStatus,
+  getBackendHealthStatus,
+  listProfiles,
+  type AIProviderStatus,
+  type BackendHealthStatus,
+} from "@/lib/api";
+import { isSupabaseConfigured } from "@/lib/env";
+import { supabase } from "@/lib/supabase";
 import { trackUsageEvent } from "@/lib/usage";
 
-export function AIProviderStatusPanel() {
+type SmokeCheck = {
+  name: string;
+  status: "passed" | "warning" | "failed";
+  detail: string;
+};
+
+type AIProviderStatusPanelProps = {
+  accessToken?: string | null;
+};
+
+export function AIProviderStatusPanel({ accessToken = null }: AIProviderStatusPanelProps) {
   const [backendStatus, setBackendStatus] = useState<BackendHealthStatus | null>(null);
   const [status, setStatus] = useState<AIProviderStatus | null>(null);
+  const [smokeChecks, setSmokeChecks] = useState<SmokeCheck[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSmokeTesting, setIsSmokeTesting] = useState(false);
 
   async function handleCheckStatus() {
     setIsLoading(true);
@@ -32,6 +52,67 @@ export function AIProviderStatusPanel() {
     }
   }
 
+  async function handleRunSmokeTest() {
+    setIsSmokeTesting(true);
+    setMessage(null);
+    const checks: SmokeCheck[] = [];
+    try {
+      const backend = await getBackendHealthStatus();
+      setBackendStatus(backend);
+      checks.push({
+        name: "Backend API",
+        status: backend.status === "ok" ? "passed" : "failed",
+        detail: `Service ${backend.service} responded with request ID ${backend.request_id || "not returned"}.`,
+      });
+
+      const provider = await getAIProviderStatus();
+      setStatus(provider);
+      checks.push({
+        name: "AI provider",
+        status: provider.configured ? "passed" : "warning",
+        detail: provider.configured ? "Provider configuration is ready." : provider.issues.join(" "),
+      });
+
+      checks.push({
+        name: "Supabase frontend",
+        status: isSupabaseConfigured && supabase ? "passed" : "failed",
+        detail: isSupabaseConfigured && supabase ? "Supabase URL and anon key are configured." : "Supabase frontend environment values are missing.",
+      });
+
+      const session = supabase ? await supabase.auth.getSession() : null;
+      const hasSession = Boolean(session?.data.session?.access_token || accessToken);
+      checks.push({
+        name: "Supabase session",
+        status: hasSession ? "passed" : "warning",
+        detail: hasSession ? "A browser auth session is available." : "Sign in to test authenticated backend connectivity.",
+      });
+
+      if (accessToken) {
+        const profiles = await listProfiles(accessToken);
+        checks.push({
+          name: "Authenticated backend",
+          status: "passed",
+          detail: `Authenticated profile list returned ${profiles.length} profile${profiles.length === 1 ? "" : "s"}.`,
+        });
+      }
+
+      trackUsageEvent("production_smoke_test_ran", "system_panel", {
+        backend_status: backend.status,
+        ai_provider_configured: provider.configured,
+        authenticated: Boolean(accessToken),
+      });
+    } catch (error) {
+      checks.push({
+        name: "Smoke test",
+        status: "failed",
+        detail: error instanceof Error ? error.message : "Smoke test failed.",
+      });
+    } finally {
+      setSmokeChecks(checks);
+      setIsSmokeTesting(false);
+    }
+  }
+
   return (
     <section className="mt-6 border border-border bg-white p-4 text-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -39,15 +120,26 @@ export function AIProviderStatusPanel() {
           <h2 className="text-base font-semibold">System diagnostics</h2>
           <p className="mt-1 text-muted-foreground">Check backend health and the configured generation provider without exposing secrets.</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
-          disabled={isLoading}
-          type="button"
-          onClick={handleCheckStatus}
-        >
-          <RefreshCw aria-hidden="true" className="h-4 w-4" />
-          {isLoading ? "Checking..." : "Check status"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 text-sm font-medium"
+            disabled={isLoading || isSmokeTesting}
+            type="button"
+            onClick={handleCheckStatus}
+          >
+            <RefreshCw aria-hidden="true" className="h-4 w-4" />
+            {isLoading ? "Checking..." : "Check status"}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 bg-foreground px-3 py-2 text-sm font-medium text-background"
+            disabled={isLoading || isSmokeTesting}
+            type="button"
+            onClick={handleRunSmokeTest}
+          >
+            <Activity aria-hidden="true" className="h-4 w-4" />
+            {isSmokeTesting ? "Running..." : "Run smoke test"}
+          </button>
+        </div>
       </div>
       {backendStatus ? (
         <div className="mt-4 border-b border-border pb-4">
@@ -89,6 +181,22 @@ export function AIProviderStatusPanel() {
           </div>
         </div>
       ) : null}
+      {smokeChecks.length ? (
+        <div className="mt-4 border-t border-border pt-4">
+          <h3 className="font-semibold">Smoke test result</h3>
+          <div className="mt-3 grid gap-2">
+            {smokeChecks.map((check) => (
+              <div key={check.name} className="border border-border p-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="font-medium">{check.name}</p>
+                  <p className={statusClassName(check.status)}>{check.status}</p>
+                </div>
+                <p className="mt-1 text-muted-foreground">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {message ? <p className="mt-3 text-sm text-red-600">{message}</p> : null}
     </section>
   );
@@ -101,4 +209,14 @@ function StatusField({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-muted-foreground">{value}</p>
     </div>
   );
+}
+
+function statusClassName(status: SmokeCheck["status"]) {
+  if (status === "passed") {
+    return "font-medium text-green-700";
+  }
+  if (status === "warning") {
+    return "font-medium text-yellow-700";
+  }
+  return "font-medium text-red-700";
 }
